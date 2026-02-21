@@ -9,6 +9,7 @@ function App() {
   const [verdict, setVerdict] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
+  const [patientLocation, setPatientLocation] = useState(null);
 
   const handlePatientSubmit = async (patientData) => {
     setIsProcessing(true);
@@ -16,8 +17,8 @@ function App() {
     setError(null);
     
     try {
-      // Call backend API for AI-powered referral
-      const aiVerdict = await processReferral(patientData);
+      // Call backend API for AI-powered referral (include location if available)
+      const aiVerdict = await processReferral(patientData, patientLocation);
       setVerdict(aiVerdict);
     } catch (err) {
       console.error('Referral processing error:', err);
@@ -29,7 +30,7 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col text-slate-100 app-shell">
-      <Header />
+      <Header onLocationChange={setPatientLocation} />
 
       <main className="flex-1 px-4 py-4 lg:px-8 lg:py-6">
         <div className="h-full grid grid-cols-12 gap-4 lg:gap-6">

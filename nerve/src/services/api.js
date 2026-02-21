@@ -3,13 +3,19 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // Process patient data and get hospital referral
-export const processReferral = async (patientData) => {
+export const processReferral = async (patientData, patientLocation = null) => {
   const response = await fetch(`${API_BASE_URL}/referral`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(transformPatientData(patientData)),
+    body: JSON.stringify({
+      ...transformPatientData(patientData),
+      patientLocation: patientLocation ? {
+        latitude: patientLocation.latitude,
+        longitude: patientLocation.longitude
+      } : null
+    }),
   });
 
   if (!response.ok) {
@@ -108,13 +114,19 @@ const transformVerdictResponse = (backendData, originalPatient) => {
   // Build reasoning text in the expected format
   const reasoning = buildReasoningText(originalPatient, triage, hospital, alternatives, backendData);
 
+  // Format distance info
+  const distance = hospital.distance ? `${hospital.distance} km` : null;
+  const eta = hospital.eta ? `${hospital.eta} min` : `${hospital.estimatedWaitTime || 15} min`;
+  const route = distance ? `${distance} away` : 'Optimal Route';
+
   return {
     hospital: hospital.hospitalName || 'Unknown Hospital',
     hospitalId: hospital.hospitalId,
-    route: 'Optimal Route', // Can be enhanced with routing API
+    route,
+    distance,
     urgency,
     reasoning,
-    eta: `${hospital.estimatedWaitTime || 15} min`,
+    eta,
     timestamp: new Date().toLocaleTimeString(),
     matchScore: hospital.matchScore,
     urgentTransfer: backendData.urgentTransfer,
@@ -127,8 +139,13 @@ const transformVerdictResponse = (backendData, originalPatient) => {
 const buildReasoningText = (patient, triage, hospital, alternatives, fullData) => {
   const hospitalReasons = hospital.reasons?.join('\n│  ├─ ') || 'Best match for patient condition';
   const altList = alternatives.slice(0, 2).map(alt => 
-    `│  └─ ${alt.hospitalName}: Score ${alt.matchScore}% - ${alt.reason}`
+    `│  └─ ${alt.hospitalName}: Score ${alt.matchScore}%${alt.distance ? ` (${alt.distance} km)` : ''} - ${alt.reason}`
   ).join('\n');
+  
+  // Distance info line
+  const distanceLine = hospital.distance && hospital.eta
+    ? `├─ DISTANCE: ${hospital.distance} km | ETA: ${hospital.eta} min (emergency transport)\n`
+    : '';
 
   return `ANALYSIS COMPLETE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -146,7 +163,7 @@ DECISION LOGIC:
 │  ├─ ${hospitalReasons}
 │  ├─ Match Score: ${hospital.matchScore || 'N/A'}%
 ${altList ? altList + '\n' : ''}│
-├─ AI REASONING:
+${distanceLine}├─ AI REASONING:
 │  └─ ${triage.reasoning || 'Analysis complete'}
 │
 └─ VERDICT: Route to ${hospital.hospitalName}

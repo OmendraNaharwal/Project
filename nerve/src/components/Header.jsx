@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Activity, UserCircle2, MoreHorizontal } from 'lucide-react';
+import { Activity, UserCircle2, MoreHorizontal, MapPin, Loader2 } from 'lucide-react';
 
-const Header = () => {
+const Header = ({ onLocationChange }) => {
   const [time, setTime] = useState(new Date());
+  const [location, setLocation] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -10,6 +13,65 @@ const Header = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const fetchLocation = () => {
+    setLocationLoading(true);
+    setLocationError(null);
+
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation not supported');
+      setLocationLoading(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        
+        try {
+          // Reverse geocoding to get address
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          const data = await response.json();
+          
+          const locationData = {
+            lat: latitude.toFixed(4),
+            lng: longitude.toFixed(4),
+            latitude: latitude,
+            longitude: longitude,
+            city: data.address?.city || data.address?.town || data.address?.village || data.address?.county || 'Unknown',
+            state: data.address?.state || ''
+          };
+          
+          setLocation(locationData);
+          // Notify parent component about location change
+          if (onLocationChange) {
+            onLocationChange(locationData);
+          }
+        } catch (err) {
+          const locationData = {
+            lat: latitude.toFixed(4),
+            lng: longitude.toFixed(4),
+            latitude: latitude,
+            longitude: longitude,
+            city: 'Location found',
+            state: ''
+          };
+          setLocation(locationData);
+          if (onLocationChange) {
+            onLocationChange(locationData);
+          }
+        }
+        setLocationLoading(false);
+      },
+      (err) => {
+        setLocationError('Access denied');
+        setLocationLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   const formatTime = (date) => {
     return date.toLocaleTimeString('en-US', {
@@ -54,6 +116,47 @@ const Header = () => {
               <div className="absolute w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping opacity-40" />
             </div>
             <span className="text-emerald-300 font-medium text-xs tracking-wide">SYSTEM LIVE</span>
+          </div>
+
+          {/* Location Button */}
+          <div className="flex items-center gap-2">
+            {location && (
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+                <MapPin className="w-4 h-4 text-cyan-400" />
+                <div className="text-xs">
+                  <div>
+                    <span className="text-cyan-300 font-medium">{location.city}</span>
+                    {location.state && <span className="text-slate-400">, {location.state}</span>}
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-mono">
+                    {location.lat}, {location.lng}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {locationError && (
+              <span className="text-xs text-red-400">{locationError}</span>
+            )}
+
+            <button
+              onClick={fetchLocation}
+              disabled={locationLoading}
+              className="flex items-center gap-2 px-3 py-2 bg-cyan-500/15 hover:bg-cyan-500/25 
+                         border border-cyan-500/30 hover:border-cyan-500/50 rounded-lg 
+                         text-cyan-400 text-xs font-medium transition-all duration-200 
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Get current location"
+            >
+              {locationLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <MapPin className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">
+                {locationLoading ? 'Locating...' : location ? 'Update' : 'Location'}
+              </span>
+            </button>
           </div>
 
           <div className="text-right">

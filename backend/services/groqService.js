@@ -1,4 +1,5 @@
 import Groq from 'groq-sdk';
+import { getEmergencyDistanceScore } from './hereService.js';
 
 // Lazy initialization - will be set when first API call is made
 let groq = null;
@@ -206,9 +207,13 @@ const generateMockResponse = (patientData, hospitals) => {
       score += 5;
     }
     
+    // Distance scoring - factor in route info if available
+    const distanceScore = getEmergencyDistanceScore(h.routeInfo, severity);
+    score += distanceScore;
+    
     // Store raw score (uncapped) for proper sorting, then cap for display
     const rawScore = score;
-    return { hospital: h, score: Math.min(Math.max(rawScore, 15), 100), rawScore, specMatches, totalSpecs };
+    return { hospital: h, score: Math.min(Math.max(rawScore, 15), 100), rawScore, specMatches, totalSpecs, routeInfo: h.routeInfo };
   }).sort((a, b) => {
     // Primary sort: by raw score (higher is better)
     if (b.rawScore !== a.rawScore) return b.rawScore - a.rawScore;
@@ -239,6 +244,11 @@ const generateMockResponse = (patientData, hospitals) => {
     `Hospital Match: ${best.hospital.name} selected with ${best.score}% compatibility score based on ${bestSpecMatches} specialization matches and facility availability.`
   );
 
+  // Build distance reason if available
+  const distanceReason = best.routeInfo 
+    ? `Distance: ${best.routeInfo.distance} km, ETA: ${best.routeInfo.emergencyDuration || best.routeInfo.duration} min`
+    : null;
+
   return {
     triage: {
       severity,
@@ -250,11 +260,15 @@ const generateMockResponse = (patientData, hospitals) => {
       hospitalId: best.hospital._id.toString(),
       hospitalName: best.hospital.name,
       matchScore: best.score,
+      distance: best.routeInfo?.distance || null,
+      eta: best.routeInfo?.emergencyDuration || best.routeInfo?.duration || null,
+      routeInfo: best.routeInfo || null,
       reasons: [
         `Has ${requiredSpecs.filter(s => best.hospital.specializations?.includes(s)).join(', ') || 'general'} specialists`,
         `Wait time: ${best.hospital.currentStatus?.waitTime || 15} minutes`,
         `${best.hospital.staff?.doctors?.available || 0} doctors on duty`,
-        `${best.hospital.facilities?.icuBeds || 0} ICU beds available`
+        `${best.hospital.facilities?.icuBeds || 0} ICU beds available`,
+        ...(distanceReason ? [distanceReason] : [])
       ],
       estimatedWaitTime: best.hospital.currentStatus?.waitTime || 15
     },
@@ -262,7 +276,9 @@ const generateMockResponse = (patientData, hospitals) => {
       hospitalId: alt.hospital._id.toString(),
       hospitalName: alt.hospital.name,
       matchScore: alt.score,
-      reason: `${alt.hospital.specializations?.filter(s => requiredSpecs.includes(s)).length || 0} matching specializations, ${alt.hospital.facilities?.icuBeds || 0} ICU beds`
+      distance: alt.routeInfo?.distance || null,
+      eta: alt.routeInfo?.emergencyDuration || alt.routeInfo?.duration || null,
+      reason: `${alt.hospital.specializations?.filter(s => requiredSpecs.includes(s)).length || 0} matching specializations, ${alt.hospital.facilities?.icuBeds || 0} ICU beds${alt.routeInfo ? `, ${alt.routeInfo.distance} km away` : ''}`
     })),
     urgentTransfer: severity === 'critical',
     additionalNotes: severity === 'critical' 

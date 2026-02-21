@@ -1,6 +1,7 @@
 import Patient from '../models/Patient.js';
 import Hospital from '../models/Hospital.js';
 import { findBestHospital } from '../services/groqService.js';
+import { calculateDistancesToHospitals } from '../services/hereService.js';
 
 // @desc    Process patient and find best hospital referral
 // @route   POST /api/referral
@@ -8,6 +9,7 @@ export const processReferral = async (req, res) => {
   try {
     // Handle both { patientData: {...} } and direct patient data
     const patientData = req.body.patientData || req.body;
+    const patientLocation = req.body.patientLocation || patientData.location;
 
     // Step 1: Fetch all available hospitals from database
     const hospitals = await Hospital.find({
@@ -21,8 +23,15 @@ export const processReferral = async (req, res) => {
       });
     }
 
+    // Step 1.5: Calculate distances to all hospitals if location provided
+    const hospitalsWithRoutes = await calculateDistancesToHospitals(
+      patientLocation,
+      hospitals,
+      true // isEmergency
+    );
+
     // Step 2: Send patient data + hospitals to Gemini for analysis
-    const referralResult = await findBestHospital(patientData, hospitals);
+    const referralResult = await findBestHospital(patientData, hospitalsWithRoutes);
 
     // Step 3: Save patient record with referral
     const patient = new Patient({
@@ -88,6 +97,7 @@ export const quickReferral = async (req, res) => {
   try {
     // Handle both { patientData: {...} } and direct patient data
     const patientData = req.body.patientData || req.body;
+    const patientLocation = req.body.patientLocation || patientData.location;
 
     // Fetch available hospitals
     const hospitals = await Hospital.find({
@@ -101,8 +111,15 @@ export const quickReferral = async (req, res) => {
       });
     }
 
+    // Calculate distances if location provided
+    const hospitalsWithRoutes = await calculateDistancesToHospitals(
+      patientLocation,
+      hospitals,
+      true // isEmergency
+    );
+
     // Get referral recommendation from Gemini
-    const referralResult = await findBestHospital(patientData, hospitals);
+    const referralResult = await findBestHospital(patientData, hospitalsWithRoutes);
 
     res.json({
       success: true,
