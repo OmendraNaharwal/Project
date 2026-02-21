@@ -26,6 +26,7 @@ NERVE ingests patient vitals and symptoms, evaluates urgency and specialty needs
 - External services for AI and routing  
 
 ## Project Structure
+```
 Project/
 ├── backend/
 │   ├── controllers/
@@ -37,7 +38,7 @@ Project/
     │   ├── components/
     │   ├── services/
     │   └── data/
-
+```
 ## ⚙️ Setup
 
 ### 1) Backend
