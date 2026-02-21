@@ -39,7 +39,7 @@ Project/
     │   ├── services/
     │   └── data/
 ```
-## ⚙️ Setup
+## Setup
 
 ### 1) Backend
 ```bash
