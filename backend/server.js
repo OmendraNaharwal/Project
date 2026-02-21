@@ -5,6 +5,7 @@ import connectDB from './config/db.js';
 import triageRoutes from './routes/triageRoutes.js';
 import hospitalRoutes from './routes/hospitalRoutes.js';
 import referralRoutes from './routes/referralRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/triage', triageRoutes);
 app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/referral', referralRoutes);
