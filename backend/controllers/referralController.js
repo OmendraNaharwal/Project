@@ -1,5 +1,6 @@
 import Patient from '../models/Patient.js';
 import Hospital from '../models/Hospital.js';
+import TriageHistory from '../models/TriageHistory.js';
 import { findBestHospital } from '../services/groqService.js';
 import { calculateDistancesToHospitals } from '../services/hereService.js';
 
@@ -91,7 +92,7 @@ export const processReferral = async (req, res) => {
   }
 };
 
-// @desc    Quick referral check (without saving patient)
+// @desc    Quick referral check (saves to history for learning)
 // @route   POST /api/referral/quick
 export const quickReferral = async (req, res) => {
   try {
@@ -118,12 +119,31 @@ export const quickReferral = async (req, res) => {
       true // isEmergency
     );
 
-    // Get referral recommendation from Gemini
-    const referralResult = await findBestHospital(patientData, hospitalsWithRoutes);
+    // Fetch similar historical cases for context
+    const complaint = patientData.chiefComplaint || patientData.complaint || '';
+    const symptoms = patientData.symptoms || [];
+    let historicalCases = [];
+    
+    try {
+      historicalCases = await TriageHistory.findSimilarCases(complaint, symptoms, 5);
+    } catch (histErr) {
+      console.log('Historical data lookup skipped:', histErr.message);
+    }
+
+    // Get referral recommendation (with historical context)
+    const referralResult = await findBestHospital(patientData, hospitalsWithRoutes, historicalCases);
+
+    // Save this case to triage history for future learning (async, don't wait)
+    saveTriageHistory(patientData, referralResult, patientLocation).catch(err => 
+      console.log('Failed to save triage history:', err.message)
+    );
 
     res.json({
       success: true,
-      data: referralResult
+      data: {
+        ...referralResult,
+        historicalCasesUsed: historicalCases.length
+      }
     });
   } catch (error) {
     res.status(500).json({
@@ -133,6 +153,53 @@ export const quickReferral = async (req, res) => {
     });
   }
 };
+
+// Helper function to save triage history
+async function saveTriageHistory(patientData, referralResult, location) {
+  const age = patientData.age || 30;
+  const ageGroup = TriageHistory.getAgeGroup(age);
+  
+  const historyEntry = new TriageHistory({
+    patientProfile: {
+      ageGroup,
+      gender: patientData.gender
+    },
+    chiefComplaint: patientData.chiefComplaint || patientData.complaint || '',
+    symptoms: patientData.symptoms || [],
+    reportedSeverity: patientData.reportedSeverity,
+    vitals: {
+      heartRate: patientData.heartRate || patientData.vitals?.heartRate,
+      bloodPressure: patientData.bloodPressure || 
+        (patientData.vitals?.bloodPressure ? 
+          `${patientData.vitals.bloodPressure.systolic}/${patientData.vitals.bloodPressure.diastolic}` : 
+          null),
+      oxygenSaturation: patientData.spO2 || patientData.vitals?.oxygenSaturation,
+      temperature: patientData.vitals?.temperature
+    },
+    triageResult: {
+      severity: referralResult.triage?.severity,
+      detectedCondition: referralResult.triage?.detectedCondition,
+      recommendation: referralResult.triage?.recommendation,
+      reasoning: referralResult.triage?.reasoning,
+      requiredSpecializations: referralResult.triage?.requiredSpecializations,
+      requiredFacilities: referralResult.triage?.requiredFacilities
+    },
+    referredHospital: {
+      hospitalId: referralResult.recommendedHospital?.hospitalId,
+      hospitalName: referralResult.recommendedHospital?.hospitalName,
+      matchScore: referralResult.recommendedHospital?.matchScore,
+      distance: referralResult.recommendedHospital?.distance,
+      eta: referralResult.recommendedHospital?.eta
+    },
+    location: location ? {
+      latitude: location.latitude,
+      longitude: location.longitude
+    } : undefined
+  });
+
+  await historyEntry.save();
+  console.log('✓ Triage history saved for learning');
+}
 
 // @desc    Get referral history for a patient
 // @route   GET /api/referral/patient/:id
