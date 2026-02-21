@@ -3,37 +3,38 @@ import Header from './components/Header';
 import PatientTriageForm from './components/PatientTriageForm';
 import VerdictEngine from './components/VerdictEngine';
 import LiveTelemetry from './components/LiveTelemetry';
-import { generateAIVerdict } from './data/mockData';
+import { processReferral } from './services/api';
 
 function App() {
   const [verdict, setVerdict] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState(null);
 
   const handlePatientSubmit = async (patientData) => {
     setIsProcessing(true);
     setVerdict(null);
+    setError(null);
     
-    // Simulate API call delay (2-3 seconds for AI processing)
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    
-    // Generate mock verdict using the data function
-    const aiVerdict = generateAIVerdict(patientData);
-    
-    setVerdict(aiVerdict);
-    setIsProcessing(false);
+    try {
+      // Call backend API for AI-powered referral
+      const aiVerdict = await processReferral(patientData);
+      setVerdict(aiVerdict);
+    } catch (err) {
+      console.error('Referral processing error:', err);
+      setError('Failed to process referral. Please check if the backend is running.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col">
-      {/* Header */}
+    <div className="min-h-screen flex flex-col text-slate-100 app-shell">
       <Header />
 
-      {/* Main Content - 12 Column Grid */}
-      <main className="flex-1 p-4 lg:p-6">
+      <main className="flex-1 px-4 py-4 lg:px-8 lg:py-6">
         <div className="h-full grid grid-cols-12 gap-4 lg:gap-6">
-          {/* Left Column - Signal Input (3 cols on lg) */}
-          <div className="col-span-12 lg:col-span-3 xl:col-span-3">
-            <div className="h-full min-h-[500px] lg:min-h-0">
+          <div className="col-span-12 lg:col-span-3">
+            <div className="h-full min-h-[520px] lg:min-h-0">
               <PatientTriageForm 
                 onSubmit={handlePatientSubmit}
                 isProcessing={isProcessing}
@@ -41,30 +42,28 @@ function App() {
             </div>
           </div>
 
-          {/* Middle Column - Verdict Engine (6 cols on lg) */}
-          <div className="col-span-12 lg:col-span-6 xl:col-span-6">
-            <div className="h-full min-h-[400px]">
+          <div className="col-span-12 lg:col-span-6">
+            <div className="h-full min-h-[520px]">
               <VerdictEngine 
                 verdict={verdict}
                 isProcessing={isProcessing}
+                error={error}
               />
             </div>
           </div>
 
-          {/* Right Column - Live Telemetry (3 cols on lg) */}
-          <div className="col-span-12 lg:col-span-3 xl:col-span-3">
-            <div className="h-full min-h-[500px] lg:min-h-0">
+          <div className="col-span-12 lg:col-span-3">
+            <div className="h-full min-h-[520px] lg:min-h-0">
               <LiveTelemetry />
             </div>
           </div>
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-slate-800 px-6 py-3">
         <div className="flex items-center justify-between text-xs text-slate-500">
           <span>NERVE v1.0 • Hackathon Build</span>
-          <span>Powered by Gemini 1.5 Flash • Explainable AI</span>
+          <span>Powered by Groq (Llama 3.3) • Explainable AI</span>
         </div>
       </footer>
     </div>

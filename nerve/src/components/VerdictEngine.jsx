@@ -1,7 +1,27 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Clock, Route, AlertTriangle, Brain, Zap } from 'lucide-react';
+import { MapPin, Clock, Route, AlertTriangle, Brain, Zap, XCircle } from 'lucide-react';
 
-const VerdictEngine = ({ verdict, isProcessing }) => {
+const VerdictEngine = ({ verdict, isProcessing, error }) => {
+  // Error state
+  if (error) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-slate-800/30 rounded-xl border border-red-500/30 p-8">
+        <div className="relative mb-6">
+          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-red-500/20 to-red-600/20 flex items-center justify-center border border-red-500/30">
+            <XCircle className="w-12 h-12 text-red-400" />
+          </div>
+        </div>
+        <h3 className="text-xl font-semibold text-white mb-2">Connection Error</h3>
+        <p className="text-red-400 text-center text-sm max-w-xs mb-4">
+          {error}
+        </p>
+        <p className="text-slate-500 text-center text-xs max-w-xs">
+          Make sure the backend server is running on port 5000
+        </p>
+      </div>
+    );
+  }
+
   // Idle state
   if (!verdict && !isProcessing) {
     return (
@@ -162,7 +182,7 @@ const VerdictEngine = ({ verdict, isProcessing }) => {
             <Brain className="w-4 h-4 text-purple-400" />
             <h4 className="text-sm font-medium text-white">AI Reasoning (XAI)</h4>
             <span className="px-2 py-0.5 text-[10px] bg-purple-500/20 text-purple-400 rounded-full">
-              Gemini 1.5
+              Llama 3.3
             </span>
           </div>
           <motion.div 

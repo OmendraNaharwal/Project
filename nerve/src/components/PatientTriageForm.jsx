@@ -49,32 +49,31 @@ const PatientTriageForm = ({ onSubmit, isProcessing }) => {
   };
 
   const getVitalColor = (type, value) => {
-    if (!value) return 'border-slate-600';
+    if (!value) return 'border-white/10';
     switch (type) {
       case 'heartRate':
-        if (value < 50 || value > 120) return 'border-red-500 bg-red-500/5';
-        if (value < 60 || value > 100) return 'border-amber-500 bg-amber-500/5';
-        return 'border-emerald-500 bg-emerald-500/5';
+        if (value < 50 || value > 120) return 'border-red-500/60 bg-red-500/5';
+        if (value < 60 || value > 100) return 'border-amber-500/60 bg-amber-500/5';
+        return 'border-emerald-500/50 bg-emerald-500/5';
       case 'spO2':
-        if (value < 90) return 'border-red-500 bg-red-500/5';
-        if (value < 95) return 'border-amber-500 bg-amber-500/5';
-        return 'border-emerald-500 bg-emerald-500/5';
+        if (value < 90) return 'border-red-500/60 bg-red-500/5';
+        if (value < 95) return 'border-amber-500/60 bg-amber-500/5';
+        return 'border-emerald-500/50 bg-emerald-500/5';
       default:
-        return 'border-slate-600';
+        return 'border-white/10';
     }
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-800/30 rounded-xl border border-slate-700/50 overflow-hidden">
-      {/* Header */}
-      <div className="px-5 py-4 border-b border-slate-700/50 bg-slate-800/50">
+    <div className="h-full flex flex-col rounded-2xl border border-white/10 bg-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] overflow-hidden">
+      <div className="px-5 py-4 border-b border-white/10 bg-white/[0.02]">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-500/20 rounded-lg">
-            <User className="w-5 h-5 text-emerald-400" />
+          <div className="p-2 bg-emerald-500/15 rounded-lg border border-emerald-500/20">
+            <User className="w-5 h-5 text-emerald-300" />
           </div>
           <div>
-            <h3 className="font-semibold text-white">Signal Input</h3>
-            <p className="text-xs text-slate-400">Patient Triage Data</p>
+            <h3 className="font-semibold text-white">Patient Intake</h3>
+            <p className="text-[11px] text-slate-400 uppercase tracking-[0.25em]">Signal Capture</p>
           </div>
         </div>
       </div>
@@ -84,7 +83,7 @@ const PatientTriageForm = ({ onSubmit, isProcessing }) => {
         {/* Name & Age Row */}
         <div className="grid grid-cols-3 gap-3">
           <div className="col-span-2">
-            <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
+            <label className="block text-[11px] font-medium text-slate-400 mb-1.5 uppercase tracking-[0.2em]">
               Patient Name
             </label>
             <div className="relative">
@@ -95,12 +94,12 @@ const PatientTriageForm = ({ onSubmit, isProcessing }) => {
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="Full name"
-                className={`w-full pl-10 pr-3 py-2.5 bg-slate-900/50 border rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all ${errors.name ? 'border-red-500' : 'border-slate-600'}`}
+                className={`w-full pl-10 pr-3 py-2.5 bg-[#0b111a]/70 border rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/60 transition-all ${errors.name ? 'border-red-500/70' : 'border-white/10'}`}
               />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
+            <label className="block text-[11px] font-medium text-slate-400 mb-1.5 uppercase tracking-[0.2em]">
               Age
             </label>
             <div className="relative">
@@ -111,7 +110,7 @@ const PatientTriageForm = ({ onSubmit, isProcessing }) => {
                 value={formData.age}
                 onChange={handleChange}
                 placeholder="Age"
-                className={`w-full pl-10 pr-2 py-2.5 bg-slate-900/50 border rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all ${errors.age ? 'border-red-500' : 'border-slate-600'}`}
+                className={`w-full pl-10 pr-2 py-2.5 bg-[#0b111a]/70 border rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/60 transition-all ${errors.age ? 'border-red-500/70' : 'border-white/10'}`}
               />
             </div>
           </div>
@@ -119,12 +118,12 @@ const PatientTriageForm = ({ onSubmit, isProcessing }) => {
 
         {/* Vitals Grid */}
         <div>
-          <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
-            Vitals Grid
+          <label className="block text-[11px] font-medium text-slate-400 mb-2 uppercase tracking-[0.2em]">
+            Vitals
           </label>
           <div className="grid grid-cols-3 gap-3">
             {/* Heart Rate */}
-            <div className={`p-3 rounded-lg border transition-all ${getVitalColor('heartRate', formData.heartRate)}`}>
+            <div className={`p-3 rounded-lg border transition-all bg-[#0b111a]/70 ${getVitalColor('heartRate', formData.heartRate)}`}>
               <div className="flex items-center gap-2 mb-2">
                 <Heart className="w-4 h-4 text-red-400" />
                 <span className="text-xs text-slate-400">HR</span>
@@ -141,7 +140,7 @@ const PatientTriageForm = ({ onSubmit, isProcessing }) => {
             </div>
 
             {/* SpO2 */}
-            <div className={`p-3 rounded-lg border transition-all ${getVitalColor('spO2', formData.spO2)}`}>
+            <div className={`p-3 rounded-lg border transition-all bg-[#0b111a]/70 ${getVitalColor('spO2', formData.spO2)}`}>
               <div className="flex items-center gap-2 mb-2">
                 <Activity className="w-4 h-4 text-cyan-400" />
                 <span className="text-xs text-slate-400">SpO2</span>
@@ -158,7 +157,7 @@ const PatientTriageForm = ({ onSubmit, isProcessing }) => {
             </div>
 
             {/* Blood Pressure */}
-            <div className="p-3 rounded-lg border border-slate-600 bg-slate-900/30">
+            <div className="p-3 rounded-lg border border-white/10 bg-[#0b111a]/70">
               <div className="flex items-center gap-2 mb-2">
                 <Gauge className="w-4 h-4 text-purple-400" />
                 <span className="text-xs text-slate-400">BP</span>
@@ -178,7 +177,7 @@ const PatientTriageForm = ({ onSubmit, isProcessing }) => {
 
         {/* Chief Complaint */}
         <div className="flex-1 flex flex-col">
-          <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
+          <label className="block text-[11px] font-medium text-slate-400 mb-1.5 uppercase tracking-[0.2em]">
             Chief Complaint
           </label>
           <div className="relative flex-1">
@@ -188,7 +187,7 @@ const PatientTriageForm = ({ onSubmit, isProcessing }) => {
               value={formData.chiefComplaint}
               onChange={handleChange}
               placeholder="Describe presenting symptoms..."
-              className={`w-full h-full min-h-[100px] pl-10 pr-3 py-2.5 bg-slate-900/50 border rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all resize-none ${errors.chiefComplaint ? 'border-red-500' : 'border-slate-600'}`}
+              className={`w-full h-full min-h-[100px] pl-10 pr-3 py-2.5 bg-[#0b111a]/70 border rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/60 transition-all resize-none ${errors.chiefComplaint ? 'border-red-500/70' : 'border-white/10'}`}
             />
           </div>
           {errors.chiefComplaint && (
@@ -202,10 +201,10 @@ const PatientTriageForm = ({ onSubmit, isProcessing }) => {
         <button
           type="submit"
           disabled={isProcessing}
-          className={`w-full py-3.5 rounded-lg font-semibold text-white flex items-center justify-center gap-2 transition-all ${
+          className={`w-full py-3.5 rounded-lg font-semibold text-white flex items-center justify-center gap-2 transition-all border ${
             isProcessing 
-              ? 'bg-slate-600 cursor-not-allowed' 
-              : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30'
+              ? 'bg-white/5 border-white/10 cursor-not-allowed text-slate-400' 
+              : 'bg-[#111826] border-white/10 hover:border-emerald-400/40 hover:text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
           }`}
         >
           {isProcessing ? (
@@ -215,7 +214,7 @@ const PatientTriageForm = ({ onSubmit, isProcessing }) => {
             </>
           ) : (
             <>
-              <Zap className="w-5 h-5" />
+              <Zap className="w-5 h-5 text-emerald-300" />
               DISPATCH
             </>
           )}

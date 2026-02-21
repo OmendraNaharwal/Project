@@ -192,7 +192,7 @@ const NERVEVerdict = ({ verdict, isProcessing }) => {
           <Brain className="w-5 h-5 text-purple-400" />
           <h4 className="font-semibold text-white">AI Reasoning</h4>
           <span className="px-2 py-0.5 text-xs bg-purple-500/20 text-purple-400 rounded-full">
-            Gemini 1.5 Flash
+            Llama 3.3 (Groq)
           </span>
         </div>
         <div className="text-slate-300 leading-relaxed">

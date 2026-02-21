@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* NERVE Medical Command Center - Dark Theme */
 :root {
@@ -6,12 +7,58 @@
   --nerve-red: #ef4444;
   --nerve-amber: #f59e0b;
   --nerve-blue: #3b82f6;
+  --nerve-ink: #0b0f14;
+  --nerve-steel: #111722;
+  --nerve-panel: #141a24;
+  --nerve-glow: #1b2a3b;
+  font-family: "Space Grotesk", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color: #e2e8f0;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  background-color: #0f172a;
   min-height: 100vh;
+  background: radial-gradient(1200px 800px at 15% 5%, rgba(34, 211, 238, 0.06), transparent 60%),
+    radial-gradient(900px 700px at 85% 0%, rgba(16, 185, 129, 0.08), transparent 55%),
+    linear-gradient(145deg, #0a0d12 0%, #0e131c 45%, #0a0d12 100%);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%);
+}
+
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle at 20% 20%, rgba(148, 163, 184, 0.08), transparent 45%),
+    radial-gradient(circle at 80% 10%, rgba(14, 165, 233, 0.08), transparent 40%),
+    radial-gradient(circle at 70% 80%, rgba(16, 185, 129, 0.08), transparent 45%);
+  opacity: 0.6;
+}
+
+.app-shell::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(transparent 0%, rgba(255, 255, 255, 0.03) 50%, transparent 100%);
+  background-size: 100% 6px;
+  opacity: 0.25;
+}
+
+.font-mono {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* Scrollbar styling for dark theme */

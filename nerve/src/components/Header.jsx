@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity } from 'lucide-react';
+import { Activity, UserCircle2, MoreHorizontal } from 'lucide-react';
 
 const Header = () => {
   const [time, setTime] = useState(new Date());
@@ -30,45 +30,44 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-slate-900 border-b border-slate-700/50 px-6 py-4">
+    <header className="bg-gradient-to-b from-[#0f141c]/90 to-[#0b1016]/90 border-b border-white/5 px-6 py-4 backdrop-blur">
       <div className="flex items-center justify-between">
-        {/* Logo & Title */}
         <div className="flex items-center gap-4">
           <div className="relative">
-            <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              <Activity className="w-7 h-7 text-white" strokeWidth={2.5} />
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-[0_0_24px_rgba(16,185,129,0.25)]">
+              <Activity className="w-6 h-6 text-white" strokeWidth={2.3} />
             </div>
-            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-slate-900 animate-pulse" />
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border border-emerald-400/30 bg-emerald-500/80" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              <span className="text-white">NERVE</span>
-            </h1>
-            <p className="text-xs text-slate-400 tracking-wider uppercase">
-              AI Medical Referral Command
+            <h1 className="text-2xl font-semibold tracking-tight text-white">NERVE</h1>
+            <p className="text-[11px] text-slate-400 tracking-[0.35em] uppercase">
+              Medical Referral Command
             </p>
           </div>
         </div>
 
-        {/* System Status */}
-        <div className="flex items-center gap-8">
-          {/* Live Status */}
-          <div className="flex items-center gap-3 px-4 py-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
-            <div className="relative flex items-center gap-2">
-              <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
-              <div className="absolute w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
+        <div className="flex items-center gap-6">
+          <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-white/5 rounded-full border border-white/10 shadow-inner">
+            <div className="relative flex items-center justify-center">
+              <div className="w-2.5 h-2.5 bg-emerald-400 rounded-full" />
+              <div className="absolute w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping opacity-40" />
             </div>
-            <span className="text-emerald-400 font-medium text-sm">SYSTEM LIVE</span>
+            <span className="text-emerald-300 font-medium text-xs tracking-wide">SYSTEM LIVE</span>
           </div>
 
-          {/* Digital Clock */}
           <div className="text-right">
-            <div className="font-mono text-2xl text-white tracking-wider">
+            <div className="font-mono text-2xl text-white tracking-widest">
               {formatTime(time)}
             </div>
-            <div className="text-xs text-slate-500 tracking-wide">
+            <div className="text-[11px] text-slate-500 tracking-wide">
               {formatDate(time)}
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-slate-400">
+            <UserCircle2 className="w-6 h-6" />
+            <MoreHorizontal className="w-5 h-5" />
           </div>
         </div>
       </div>
