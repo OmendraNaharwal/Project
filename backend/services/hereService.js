@@ -1,59 +1,15 @@
-// HERE Maps API Service for distance and route calculation
-
-const HERE_API_KEY = process.env.HERE_API_KEY;
+// Distance calculation service using Haversine formula
+// Uses hospital coordinates from database to calculate estimated distance and ETA
 
 /**
- * Calculate route between two points using HERE Routing API
+ * Calculate route between two points using Haversine formula
  * @param {Object} origin - { latitude, longitude }
  * @param {Object} destination - { latitude, longitude }
- * @param {string} transportMode - 'car' | 'truck' | 'pedestrian'
- * @returns {Object} - { distance (km), duration (minutes), summary }
+ * @param {boolean} isEmergency - If true, use faster emergency vehicle speed
+ * @returns {Object} - { distance (km), duration (minutes) }
  */
-export const calculateRoute = async (origin, destination, transportMode = 'car') => {
-  if (!HERE_API_KEY) {
-    console.log('⚠️ HERE_API_KEY not set - using estimated distance');
-    return calculateHaversineDistance(origin, destination);
-  }
-
-  try {
-    const url = new URL('https://router.hereapi.com/v8/routes');
-    url.searchParams.set('transportMode', transportMode);
-    url.searchParams.set('origin', `${origin.latitude},${origin.longitude}`);
-    url.searchParams.set('destination', `${destination.latitude},${destination.longitude}`);
-    url.searchParams.set('return', 'summary,typicalDuration');
-    url.searchParams.set('apiKey', HERE_API_KEY);
-
-    const response = await fetch(url.toString());
-    
-    if (!response.ok) {
-      console.error('HERE API Error:', response.status, await response.text());
-      return calculateHaversineDistance(origin, destination);
-    }
-
-    const data = await response.json();
-    
-    if (data.routes && data.routes.length > 0) {
-      const route = data.routes[0];
-      const section = route.sections[0];
-      
-      return {
-        distance: (section.summary.length / 1000).toFixed(1), // Convert to km
-        duration: Math.ceil(section.summary.duration / 60), // Convert to minutes
-        typicalDuration: section.summary.typicalDuration 
-          ? Math.ceil(section.summary.typicalDuration / 60) 
-          : null,
-        trafficDelay: section.summary.trafficDelay 
-          ? Math.ceil(section.summary.trafficDelay / 60) 
-          : 0,
-        source: 'here_api'
-      };
-    }
-    
-    return calculateHaversineDistance(origin, destination);
-  } catch (error) {
-    console.error('HERE API Error:', error.message);
-    return calculateHaversineDistance(origin, destination);
-  }
+export const calculateRoute = async (origin, destination, isEmergency = false) => {
+  return calculateHaversineDistance(origin, destination, isEmergency);
 };
 
 /**
@@ -71,8 +27,6 @@ export const calculateDistancesToHospitals = async (patientLocation, hospitals, 
       routeInfo: null
     }));
   }
-
-  const transportMode = isEmergency ? 'car' : 'car'; // Could use 'truck' for ambulance
   
   const hospitalsWithRoutes = await Promise.all(
     hospitals.map(async (hospital) => {
@@ -88,13 +42,8 @@ export const calculateDistancesToHospitals = async (patientLocation, hospitals, 
       const routeInfo = await calculateRoute(
         patientLocation,
         hospitalObj.location,
-        transportMode
+        isEmergency
       );
-
-      // Apply emergency factor (ambulance can be ~30% faster)
-      if (isEmergency && routeInfo.duration) {
-        routeInfo.emergencyDuration = Math.ceil(routeInfo.duration * 0.7);
-      }
 
       return {
         ...hospitalObj,
@@ -107,9 +56,12 @@ export const calculateDistancesToHospitals = async (patientLocation, hospitals, 
 };
 
 /**
- * Haversine formula for fallback distance calculation
+ * Haversine formula for distance calculation using coordinates
+ * @param {Object} origin - { latitude, longitude }
+ * @param {Object} destination - { latitude, longitude }
+ * @param {boolean} isEmergency - If true, use faster emergency vehicle speed
  */
-const calculateHaversineDistance = (origin, destination) => {
+const calculateHaversineDistance = (origin, destination, isEmergency = false) => {
   const R = 6371; // Earth's radius in km
   const dLat = toRad(destination.latitude - origin.latitude);
   const dLon = toRad(destination.longitude - origin.longitude);
@@ -122,14 +74,20 @@ const calculateHaversineDistance = (origin, destination) => {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c;
   
-  // Estimate duration: ~30 km/h in city traffic, ~50 km/h for emergency
-  const avgSpeed = 30; // km/h for normal traffic
-  const duration = Math.ceil((distance / avgSpeed) * 60); // minutes
+  // Estimate duration based on vehicle type
+  // Normal traffic: ~25-30 km/h in city
+  // Emergency vehicle: ~40-50 km/h with sirens
+  const normalSpeed = 25; // km/h for normal city traffic
+  const emergencySpeed = 45; // km/h for ambulance with sirens
+  
+  const normalDuration = Math.ceil((distance / normalSpeed) * 60); // minutes
+  const emergencyDuration = Math.ceil((distance / emergencySpeed) * 60); // minutes
   
   return {
     distance: distance.toFixed(1),
-    duration,
-    source: 'estimated'
+    duration: normalDuration,
+    emergencyDuration: isEmergency ? emergencyDuration : null,
+    source: 'coordinates'
   };
 };
 

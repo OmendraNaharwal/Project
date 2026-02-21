@@ -69,9 +69,17 @@ export const getHospital = async (req, res) => {
 // @route   PUT /api/hospitals/:id
 export const updateHospital = async (req, res) => {
   try {
+    // Merge lastUpdated into currentStatus if it exists
+    const updateData = { ...req.body };
+    if (updateData.currentStatus) {
+      updateData.currentStatus.lastUpdated = new Date();
+    } else {
+      updateData['currentStatus.lastUpdated'] = new Date();
+    }
+
     const hospital = await Hospital.findByIdAndUpdate(
       req.params.id,
-      { ...req.body, 'currentStatus.lastUpdated': new Date() },
+      updateData,
       { new: true, runValidators: true }
     );
 
@@ -192,6 +200,70 @@ export const deleteHospital = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to delete hospital',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get logged-in user's hospital
+// @route   GET /api/hospitals/my
+export const getMyHospital = async (req, res) => {
+  try {
+    const hospital = await Hospital.findById(req.user.hospital._id);
+    
+    if (!hospital) {
+      return res.status(404).json({
+        success: false,
+        message: 'Hospital not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: hospital
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch hospital',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Update logged-in user's hospital
+// @route   PUT /api/hospitals/my
+export const updateMyHospital = async (req, res) => {
+  try {
+    // Merge lastUpdated into currentStatus if it exists
+    const updateData = { ...req.body };
+    if (updateData.currentStatus) {
+      updateData.currentStatus.lastUpdated = new Date();
+    } else {
+      updateData['currentStatus.lastUpdated'] = new Date();
+    }
+
+    const hospital = await Hospital.findByIdAndUpdate(
+      req.user.hospital._id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!hospital) {
+      return res.status(404).json({
+        success: false,
+        message: 'Hospital not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: hospital
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update hospital',
       error: error.message
     });
   }

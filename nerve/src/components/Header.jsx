@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Activity, UserCircle2, MoreHorizontal, MapPin, Loader2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Activity, UserCircle2, Settings, MapPin, Loader2 } from 'lucide-react';
 
 const Header = ({ onLocationChange }) => {
   const [time, setTime] = useState(new Date());
@@ -170,7 +171,13 @@ const Header = ({ onLocationChange }) => {
 
           <div className="flex items-center gap-2 text-slate-400">
             <UserCircle2 className="w-6 h-6" />
-            <MoreHorizontal className="w-5 h-5" />
+            <Link
+              to="/hospitals"
+              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+              title="Hospital Settings"
+            >
+              <Settings className="w-5 h-5 hover:text-emerald-400 transition-colors" />
+            </Link>
           </div>
         </div>
       </div>

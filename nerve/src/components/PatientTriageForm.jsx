@@ -1,16 +1,15 @@
 import { useState } from 'react';
 import { User, Heart, Activity, Gauge, FileText, Zap, AlertCircle, Calendar, AlertTriangle } from 'lucide-react';
-import { mockPatient } from '../data/mockData';
 
 const PatientTriageForm = ({ onSubmit, isProcessing }) => {
   const [formData, setFormData] = useState({
-    name: mockPatient.name,
-    age: mockPatient.age,
-    heartRate: mockPatient.heartRate,
-    spO2: mockPatient.spO2,
-    bloodPressure: mockPatient.bloodPressure,
-    chiefComplaint: mockPatient.chiefComplaint,
-    reportedSeverity: mockPatient.reportedSeverity || 'moderate'
+    name: '',
+    age: '',
+    heartRate: '',
+    spO2: '',
+    bloodPressure: '',
+    chiefComplaint: '',
+    reportedSeverity: 'moderate'
   });
 
   const [errors, setErrors] = useState({});

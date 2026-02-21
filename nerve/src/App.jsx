@@ -1,11 +1,30 @@
 import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/Header';
 import PatientTriageForm from './components/PatientTriageForm';
 import VerdictEngine from './components/VerdictEngine';
 import LiveTelemetry from './components/LiveTelemetry';
+import HospitalManagerPage from './pages/HospitalManagerPage';
+import LoginPage from './pages/LoginPage';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { processReferral } from './services/api';
 
-function App() {
+// Protected Route component - redirects to login if not authenticated
+function ProtectedRoute({ children }) {
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#080b10] flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+  
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
+}
+
+function MainApp() {
   const [verdict, setVerdict] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
@@ -68,6 +87,21 @@ function App() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/triage" element={<ProtectedRoute><MainApp /></ProtectedRoute>} />
+          <Route path="/hospitals" element={<ProtectedRoute><HospitalManagerPage /></ProtectedRoute>} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 

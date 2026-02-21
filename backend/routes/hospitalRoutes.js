@@ -6,13 +6,22 @@ import {
   updateHospital,
   updateHospitalStatus,
   getAvailableHospitals,
-  deleteHospital
+  deleteHospital,
+  getMyHospital,
+  updateMyHospital
 } from '../controllers/hospitalController.js';
+import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // GET /api/hospitals/available - Get available hospitals for referral
 router.get('/available', getAvailableHospitals);
+
+// GET /api/hospitals/my - Get logged-in user's hospital (protected)
+router.get('/my', protect, getMyHospital);
+
+// PUT /api/hospitals/my - Update logged-in user's hospital (protected)
+router.put('/my', protect, updateMyHospital);
 
 // POST /api/hospitals - Create new hospital
 router.post('/', createHospital);
