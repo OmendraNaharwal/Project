@@ -57,15 +57,34 @@ const CONDITIONS = {
 };
 
 // Mock response generator for fallback
-const generateMockResponse = (patientData, hospitals) => {
+const generateMockResponse = (patientData, hospitals, historicalCases = []) => {
   // Extract patient info - check both field names
   const complaint = (patientData.chiefComplaint || patientData.complaint || '').toLowerCase();
   const symptomsText = (patientData.symptoms || []).join(' ').toLowerCase();
   const searchText = `${complaint} ${symptomsText}`;
   const age = patientData.age || 30;
-  const hr = patientData.vitals?.heartRate || 80;
-  const spo2 = patientData.vitals?.oxygenSaturation || 98;
+  const hr = patientData.heartRate || patientData.vitals?.heartRate || 80;
+  const spo2 = patientData.spO2 || patientData.vitals?.oxygenSaturation || 98;
   const reportedSeverity = patientData.reportedSeverity || 'moderate';
+  
+  // Learn from historical cases
+  let historicalSeverityHint = null;
+  if (historicalCases.length > 0) {
+    // Check if similar cases had a particular severity pattern
+    const severityCounts = { critical: 0, urgent: 0, moderate: 0, minor: 0 };
+    historicalCases.forEach(c => {
+      if (c.triageResult?.severity) {
+        severityCounts[c.triageResult.severity]++;
+      }
+    });
+    // Find the most common severity in similar cases
+    const maxCount = Math.max(...Object.values(severityCounts));
+    if (maxCount > 0) {
+      historicalSeverityHint = Object.entries(severityCounts)
+        .find(([_, count]) => count === maxCount)?.[0];
+      console.log(`📊 Historical data suggests ${historicalSeverityHint} for similar cases`);
+    }
+  }
   
   // Detect condition based on keywords in BOTH complaint and symptoms
   let detectedCondition = null;
@@ -129,6 +148,24 @@ const generateMockResponse = (patientData, hospitals) => {
   if (age > 65 || age < 5) {
     if (severity === 'moderate') severity = 'urgent';
     vitalAlerts.push('Age-related risk factor');
+  }
+  
+  // Apply historical data learning - if historical cases show different severity pattern
+  if (historicalSeverityHint) {
+    const severityLevelsNum = { 'minor': 0, 'moderate': 1, 'urgent': 2, 'critical': 3 };
+    const currentLevel = severityLevelsNum[severity] || 1;
+    const historicalLevel = severityLevelsNum[historicalSeverityHint] || 1;
+    
+    // If historical data suggests higher severity and current is lower, consider escalating
+    if (historicalLevel > currentLevel && historicalLevel - currentLevel === 1) {
+      // Only escalate one level based on historical data
+      const severityNames = ['minor', 'moderate', 'urgent', 'critical'];
+      const newSeverity = severityNames[currentLevel + 1];
+      if (newSeverity) {
+        severity = newSeverity;
+        vitalAlerts.push('Historical pattern suggests elevated severity');
+      }
+    }
   }
   
   const requiredSpecs = detectedCondition.specializations;
@@ -270,9 +307,11 @@ const generateMockResponse = (patientData, hospitals) => {
   return {
     triage: {
       severity,
+      detectedCondition: detectedCondition.name,
       requiredSpecializations: requiredSpecs,
       requiredFacilities: detectedCondition.facilities,
-      reasoning: reasoningParts.join('. ')
+      reasoning: reasoningParts.join('. '),
+      historicalCasesUsed: historicalCases.length
     },
     recommendedHospital: {
       hospitalId: best.hospital._id.toString(),
@@ -352,10 +391,10 @@ Return ONLY a valid JSON response (no markdown, no code blocks) with this exact 
   "additionalNotes": "Any critical notes for transfer/care"
 }`;
 
-export const findBestHospital = async (patientData, hospitals) => {
+export const findBestHospital = async (patientData, hospitals, historicalCases = []) => {
   if (!process.env.GROQ_API_KEY) {
     console.log('No GROQ_API_KEY found, using mock mode');
-    return generateMockResponse(patientData, hospitals);
+    return generateMockResponse(patientData, hospitals, historicalCases);
   }
 
   // Create a map of hospital ID to routeInfo for later enrichment
@@ -392,24 +431,43 @@ export const findBestHospital = async (patientData, hospitals) => {
       eta: h.routeInfo?.emergencyDuration || h.routeInfo?.duration || null
     }));
 
+    // Format historical cases for context
+    let historicalContext = '';
+    if (historicalCases.length > 0) {
+      historicalContext = `
+=== HISTORICAL SIMILAR CASES (for learning/reference) ===
+${historicalCases.map((c, i) => `
+Case ${i + 1}:
+- Complaint: ${c.chiefComplaint}
+- Age Group: ${c.patientProfile?.ageGroup || 'unknown'}
+- Triage Severity: ${c.triageResult?.severity || 'unknown'}
+- Detected Condition: ${c.triageResult?.detectedCondition || 'unknown'}
+- Referred to: ${c.referredHospital?.hospitalName || 'unknown'}
+- Match Score: ${c.referredHospital?.matchScore || 'N/A'}
+${c.outcome?.wasAccurate !== undefined ? `- Outcome Feedback: ${c.outcome.wasAccurate ? 'Accurate' : 'Needs improvement'}` : ''}
+`).join('')}
+Use these past cases as reference to improve your assessment accuracy. If similar complaints were triaged at a certain severity, consider that pattern.
+`;
+    }
+
     const userPrompt = `
 === PATIENT DATA ===
 - Name: ${patientData.name}
 - Age: ${patientData.age}
 - Gender: ${patientData.gender}
-- Chief Complaint: ${patientData.chiefComplaint}
+- Chief Complaint: ${patientData.chiefComplaint || patientData.complaint}
 - Symptoms: ${patientData.symptoms?.join(', ') || 'None reported'}
 - PATIENT-REPORTED SEVERITY: ${(patientData.reportedSeverity || 'moderate').toUpperCase()} (consider this as patient's own assessment of urgency)
 - Vitals:
-  * Heart Rate: ${patientData.vitals?.heartRate || 'N/A'} bpm
-  * Blood Pressure: ${patientData.vitals?.bloodPressure?.systolic || 'N/A'}/${patientData.vitals?.bloodPressure?.diastolic || 'N/A'} mmHg
+  * Heart Rate: ${patientData.heartRate || patientData.vitals?.heartRate || 'N/A'} bpm
+  * Blood Pressure: ${patientData.bloodPressure || (patientData.vitals?.bloodPressure ? `${patientData.vitals.bloodPressure.systolic}/${patientData.vitals.bloodPressure.diastolic}` : 'N/A')} mmHg
   * Temperature: ${patientData.vitals?.temperature || 'N/A'}°F
-  * Oxygen Saturation: ${patientData.vitals?.oxygenSaturation || 'N/A'}%
+  * Oxygen Saturation: ${patientData.spO2 || patientData.vitals?.oxygenSaturation || 'N/A'}%
   * Respiratory Rate: ${patientData.vitals?.respiratoryRate || 'N/A'} breaths/min
 - Medical History: ${patientData.medicalHistory || 'None reported'}
 - Allergies: ${patientData.allergies?.join(', ') || 'None reported'}
 - Current Medications: ${patientData.currentMedications?.join(', ') || 'None reported'}
-
+${historicalContext}
 === AVAILABLE HOSPITALS ===
 ${JSON.stringify(hospitalsSummary, null, 2)}
 
