@@ -73,6 +73,7 @@ const transformPatientData = (frontendData) => {
     gender: frontendData.gender || 'other',
     chiefComplaint: frontendData.chiefComplaint,
     symptoms: frontendData.symptoms || extractSymptoms(frontendData.chiefComplaint),
+    reportedSeverity: frontendData.reportedSeverity || 'moderate',
     vitals: {
       heartRate: parseInt(frontendData.heartRate),
       bloodPressure: {
@@ -146,6 +147,11 @@ const buildReasoningText = (patient, triage, hospital, alternatives, fullData) =
   const distanceLine = hospital.distance && hospital.eta
     ? `├─ DISTANCE: ${hospital.distance} km | ETA: ${hospital.eta} min (emergency transport)\n`
     : '';
+    
+  // Reported severity line
+  const reportedSeverityLine = patient.reportedSeverity 
+    ? `├─ Patient-Reported: ${patient.reportedSeverity.toUpperCase()}\n`
+    : '';
 
   return `ANALYSIS COMPLETE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -156,7 +162,7 @@ PRESENTATION: ${patient.chiefComplaint}
 
 DECISION LOGIC:
 ├─ Severity Assessment: ${triage.severity?.toUpperCase() || 'EVALUATING'}
-├─ Required Specializations: ${triage.requiredSpecializations?.join(', ') || 'General Care'}
+${reportedSeverityLine}├─ Required Specializations: ${triage.requiredSpecializations?.join(', ') || 'General Care'}
 │
 ├─ HOSPITAL SELECTION:
 │  ├─ ${hospital.hospitalName}: ✓ RECOMMENDED

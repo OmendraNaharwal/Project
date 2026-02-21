@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Heart, Activity, Gauge, FileText, Zap, AlertCircle, Calendar } from 'lucide-react';
+import { User, Heart, Activity, Gauge, FileText, Zap, AlertCircle, Calendar, AlertTriangle } from 'lucide-react';
 import { mockPatient } from '../data/mockData';
 
 const PatientTriageForm = ({ onSubmit, isProcessing }) => {
@@ -9,7 +9,8 @@ const PatientTriageForm = ({ onSubmit, isProcessing }) => {
     heartRate: mockPatient.heartRate,
     spO2: mockPatient.spO2,
     bloodPressure: mockPatient.bloodPressure,
-    chiefComplaint: mockPatient.chiefComplaint
+    chiefComplaint: mockPatient.chiefComplaint,
+    reportedSeverity: mockPatient.reportedSeverity || 'moderate'
   });
 
   const [errors, setErrors] = useState({});
@@ -172,6 +173,47 @@ const PatientTriageForm = ({ onSubmit, isProcessing }) => {
               />
               <span className="text-xs text-slate-500">mmHg</span>
             </div>
+          </div>
+        </div>
+
+        {/* Reported Severity */}
+        <div>
+          <label className="block text-[11px] font-medium text-slate-400 mb-2 uppercase tracking-[0.2em]">
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="w-3 h-3" />
+              Reported Severity
+            </span>
+          </label>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { value: 'mild', label: 'Mild', description: 'Minor discomfort' },
+              { value: 'moderate', label: 'Moderate', description: 'Significant pain' },
+              { value: 'severe', label: 'Severe', description: 'Intense symptoms' },
+              { value: 'critical', label: 'Critical', description: 'Life-threatening' }
+            ].map(({ value, label, description }) => {
+              const isSelected = formData.reportedSeverity === value;
+              const colors = {
+                mild: isSelected ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-400' : '',
+                moderate: isSelected ? 'border-amber-500/60 bg-amber-500/15 text-amber-400' : '',
+                severe: isSelected ? 'border-orange-500/60 bg-orange-500/15 text-orange-400' : '',
+                critical: isSelected ? 'border-red-500/60 bg-red-500/15 text-red-400' : ''
+              };
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, reportedSeverity: value }))}
+                  className={`p-2.5 rounded-lg border transition-all text-center ${
+                    isSelected
+                      ? colors[value]
+                      : 'border-white/10 bg-[#0b111a]/70 hover:border-white/20 text-slate-300'
+                  }`}
+                >
+                  <span className="text-sm font-medium">{label}</span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{description}</p>
+                </button>
+              );
+            })}
           </div>
         </div>
 

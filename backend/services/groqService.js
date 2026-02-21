@@ -65,6 +65,7 @@ const generateMockResponse = (patientData, hospitals) => {
   const age = patientData.age || 30;
   const hr = patientData.vitals?.heartRate || 80;
   const spo2 = patientData.vitals?.oxygenSaturation || 98;
+  const reportedSeverity = patientData.reportedSeverity || 'moderate';
   
   // Detect condition based on keywords in BOTH complaint and symptoms
   let detectedCondition = null;
@@ -85,9 +86,26 @@ const generateMockResponse = (patientData, hospitals) => {
     };
   }
   
-  // Adjust severity based on vitals
+  // Adjust severity based on vitals AND reported severity
   let severity = detectedCondition.baseSeverity;
   let vitalAlerts = [];
+  
+  // Factor in patient-reported severity (escalate if patient reports higher)
+  const severityLevels = { 'mild': 0, 'minor': 0, 'moderate': 1, 'urgent': 2, 'severe': 2, 'critical': 3 };
+  const severityNames = ['minor', 'moderate', 'urgent', 'critical'];
+  
+  // If patient reports higher severity, consider escalating
+  if (severityLevels[reportedSeverity] > severityLevels[severity]) {
+    // Patient-reported severity influences final assessment
+    // Critical reports always escalate, severe escalates moderate to urgent
+    if (reportedSeverity === 'critical') {
+      severity = 'critical';
+      vitalAlerts.push('Patient reports critical condition');
+    } else if (reportedSeverity === 'severe' && severity !== 'critical') {
+      severity = 'urgent';
+      vitalAlerts.push('Patient reports severe symptoms');
+    }
+  }
   
   if (hr > 120) {
     severity = 'critical';
@@ -295,11 +313,17 @@ Based on the patient's condition and available hospitals, determine the BEST hos
 
 Consider these factors when ranking hospitals:
 1. MEDICAL MATCH: Does the hospital have the required specialization/facilities for this condition?
-2. AVAILABILITY: Is the hospital accepting patients? Are doctors/nurses available?
-3. CAPACITY: ICU beds, ventilators, operation theaters if needed
-4. EMERGENCY: For critical patients, prioritize hospitals with emergency services
-5. WAIT TIME: Lower wait time is better, especially for urgent cases
-6. OCCUPANCY: Lower occupancy rate means better attention
+2. DISTANCE & ETA: For CRITICAL cases, closer hospitals with lower ETA are crucial - a few minutes can save a life. For moderate cases, distance is less critical if the hospital has better specialization.
+3. AVAILABILITY: Is the hospital accepting patients? Are doctors/nurses available?
+4. CAPACITY: ICU beds, ventilators, operation theaters if needed
+5. EMERGENCY: For critical patients, prioritize hospitals with emergency services AND low ETA
+6. WAIT TIME: Lower wait time is better, especially for urgent cases
+7. OCCUPANCY: Lower occupancy rate means better attention
+
+CRITICAL DECISION LOGIC FOR DISTANCE:
+- If severity is CRITICAL and ETA > 15 min, consider closer alternatives even with slightly fewer specialized facilities
+- If severity is URGENT and ETA > 20 min, factor distance more heavily
+- For MODERATE cases, prioritize specialization over distance
 
 Return ONLY a valid JSON response (no markdown, no code blocks) with this exact structure:
 {
@@ -334,9 +358,18 @@ export const findBestHospital = async (patientData, hospitals) => {
     return generateMockResponse(patientData, hospitals);
   }
 
+  // Create a map of hospital ID to routeInfo for later enrichment
+  const routeInfoMap = new Map();
+  hospitals.forEach(h => {
+    const id = h._id?.toString() || h.id;
+    if (h.routeInfo) {
+      routeInfoMap.set(id, h.routeInfo);
+    }
+  });
+
   try {
     const hospitalsSummary = hospitals.map(h => ({
-      id: h._id.toString(),
+      id: h._id?.toString() || h.id,
       name: h.name,
       type: h.type,
       address: `${h.address?.city || 'Unknown'}, ${h.address?.state || ''}`,
@@ -353,7 +386,10 @@ export const findBestHospital = async (patientData, hospitals) => {
         waitTime: h.currentStatus?.waitTime || 0,
         occupancyRate: h.currentStatus?.occupancyRate || 0
       },
-      rating: h.rating
+      rating: h.rating,
+      // Include distance info for AI decision making
+      distance: h.routeInfo?.distance ? `${h.routeInfo.distance} km` : null,
+      eta: h.routeInfo?.emergencyDuration || h.routeInfo?.duration || null
     }));
 
     const userPrompt = `
@@ -363,6 +399,7 @@ export const findBestHospital = async (patientData, hospitals) => {
 - Gender: ${patientData.gender}
 - Chief Complaint: ${patientData.chiefComplaint}
 - Symptoms: ${patientData.symptoms?.join(', ') || 'None reported'}
+- PATIENT-REPORTED SEVERITY: ${(patientData.reportedSeverity || 'moderate').toUpperCase()} (consider this as patient's own assessment of urgency)
 - Vitals:
   * Heart Rate: ${patientData.vitals?.heartRate || 'N/A'} bpm
   * Blood Pressure: ${patientData.vitals?.bloodPressure?.systolic || 'N/A'}/${patientData.vitals?.bloodPressure?.diastolic || 'N/A'} mmHg
@@ -376,7 +413,7 @@ export const findBestHospital = async (patientData, hospitals) => {
 === AVAILABLE HOSPITALS ===
 ${JSON.stringify(hospitalsSummary, null, 2)}
 
-Analyze the patient condition and match with the best available hospital. Respond with JSON only, no markdown.`;
+Analyze the patient condition and match with the best available hospital. The patient has self-reported their severity as ${(patientData.reportedSeverity || 'moderate').toUpperCase()} - factor this into your assessment. Each hospital includes distance and ETA (estimated time of arrival) from the patient's location if available. For critical cases, strongly consider travel time - closer hospitals may be better even if slightly less specialized. Respond with JSON only, no markdown.`;
 
     const client = getGroqClient();
     if (!client) {
@@ -401,7 +438,39 @@ Analyze the patient condition and match with the best available hospital. Respon
     if (responseText) {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+        const result = JSON.parse(jsonMatch[0]);
+        
+        // Enrich response with distance/ETA info
+        if (result.recommendedHospital?.hospitalId) {
+          const routeInfo = routeInfoMap.get(result.recommendedHospital.hospitalId);
+          if (routeInfo) {
+            result.recommendedHospital.distance = routeInfo.distance;
+            result.recommendedHospital.eta = routeInfo.emergencyDuration || routeInfo.duration;
+            result.recommendedHospital.routeInfo = routeInfo;
+            // Add distance to reasons
+            if (routeInfo.distance) {
+              result.recommendedHospital.reasons = result.recommendedHospital.reasons || [];
+              result.recommendedHospital.reasons.push(`Distance: ${routeInfo.distance} km, ETA: ${routeInfo.emergencyDuration || routeInfo.duration} min`);
+            }
+          }
+        }
+        
+        // Enrich alternatives with distance info
+        if (result.alternativeHospitals) {
+          result.alternativeHospitals = result.alternativeHospitals.map(alt => {
+            const routeInfo = routeInfoMap.get(alt.hospitalId);
+            if (routeInfo) {
+              return {
+                ...alt,
+                distance: routeInfo.distance,
+                eta: routeInfo.emergencyDuration || routeInfo.duration
+              };
+            }
+            return alt;
+          });
+        }
+        
+        return result;
       }
     }
     

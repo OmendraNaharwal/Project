@@ -83,7 +83,8 @@ export const mockPatient = {
   heartRate: 112,
   spO2: 94,
   bloodPressure: '150/95',
-  chiefComplaint: 'Severe chest pain radiating to left arm, shortness of breath, sweating'
+  chiefComplaint: 'Severe chest pain radiating to left arm, shortness of breath, sweating',
+  reportedSeverity: 'severe'
 };
 
 export const generateAIVerdict = (patient) => {
