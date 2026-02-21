@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* NERVE Medical Command Center - Dark Theme */
+:root {
+  --nerve-green: #10b981;
+  --nerve-red: #ef4444;
+  --nerve-amber: #f59e0b;
+  --nerve-blue: #3b82f6;
+}
+
+body {
+  margin: 0;
+  background-color: #0f172a;
+  min-height: 100vh;
+}
+
+/* Scrollbar styling for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Typewriter cursor animation */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.typewriter-cursor {
+  animation: blink 1s infinite;
+}
+
+/* Pulse animation for critical status */
+@keyframes pulse-critical {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.pulse-critical {
+  animation: pulse-critical 1.5s ease-in-out infinite;
+}
