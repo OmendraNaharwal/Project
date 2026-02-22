@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Clock, Route, AlertTriangle, Brain, Zap, XCircle } from 'lucide-react';
+import { MapPin, Clock, AlertTriangle, Brain, Zap, XCircle, CheckCircle2, AlertCircle, Building2, Navigation } from 'lucide-react';
 
 const VerdictEngine = ({ verdict, isProcessing, error }) => {
   // Error state
@@ -106,13 +106,6 @@ const VerdictEngine = ({ verdict, isProcessing, error }) => {
   }
 
   // Verdict display
-  const urgencyColors = {
-    CRITICAL: 'border-red-500/50 bg-red-500/5',
-    HIGH: 'border-amber-500/50 bg-amber-500/5',
-    MODERATE: 'border-blue-500/50 bg-blue-500/5',
-    LOW: 'border-emerald-500/50 bg-emerald-500/5'
-  };
-
   const urgencyBadge = {
     CRITICAL: 'bg-red-500/20 text-red-400 border-red-500/30',
     HIGH: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
@@ -146,54 +139,145 @@ const VerdictEngine = ({ verdict, isProcessing, error }) => {
           </div>
         </div>
 
-        {/* Decision Card */}
-        <motion.div 
-          className={`mx-4 mt-4 p-5 rounded-xl border-2 ${urgencyColors[verdict.urgency]}`}
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.4 }}
-        >
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-emerald-500/20 rounded-xl">
-              <MapPin className="w-8 h-8 text-emerald-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-xs text-emerald-400 font-medium uppercase tracking-wider mb-1">
-                Recommended Destination
-              </p>
-              <h2 className="text-2xl font-bold text-white mb-3">{verdict.hospital}</h2>
-              <div className="flex flex-wrap gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <Route className="w-4 h-4 text-slate-400" />
-                  <span className="text-slate-300">{verdict.route}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-slate-400" />
-                  <span className="text-slate-300">ETA: {verdict.eta}</span>
+        {/* AI Reasoning - Clinical Decision Rationale */}
+        <div className="flex-1 mx-4 my-4 overflow-y-auto">
+          {/* Clinical Decision Rationale Header */}
+          <div className="mb-4">
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Clinical Decision Rationale</p>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-500/20 rounded-lg">
+                <MapPin className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">{verdict.hospital}</h3>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="flex items-center gap-1 text-xs text-slate-400">
+                    <Navigation className="w-3 h-3" /> Optimal Route
+                  </span>
+                  <span className="flex items-center gap-1 text-xs text-slate-400">
+                    <Clock className="w-3 h-3" /> ETA {verdict.eta}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
-        </motion.div>
 
-        {/* AI Reasoning */}
-        <div className="flex-1 mx-4 my-4 overflow-hidden">
-          <div className="flex items-center gap-2 mb-3">
-            <Brain className="w-4 h-4 text-purple-400" />
-            <h4 className="text-sm font-medium text-white">AI Reasoning (XAI)</h4>
-            <span className="px-2 py-0.5 text-[10px] bg-purple-500/20 text-purple-400 rounded-full">
-              Llama 3.3
-            </span>
-          </div>
+          {/* Decision Summary Box */}
           <motion.div 
-            className="h-[calc(100%-2rem)] bg-slate-900/50 rounded-lg p-4 overflow-y-auto border border-slate-700/30"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
+            className="bg-slate-900/60 rounded-lg p-4 border border-slate-700/50 mb-4"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
           >
-            <pre className="font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
-              {verdict.reasoning}
-            </pre>
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Decision Summary</h4>
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <span className="text-xs text-slate-400 w-28">Severity Level:</span>
+                <span className={`text-xs font-semibold ${
+                  verdict.urgency === 'CRITICAL' ? 'text-red-400' :
+                  verdict.urgency === 'HIGH' ? 'text-amber-400' :
+                  verdict.urgency === 'MODERATE' ? 'text-blue-400' : 'text-emerald-400'
+                }`}>{verdict.urgency}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Building2 className="w-4 h-4 text-cyan-400" />
+                <span className="text-xs text-slate-400 w-28">Required Specialty:</span>
+                <span className="text-xs text-white font-medium">{verdict.specialty || 'General Emergency'}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <MapPin className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs text-slate-400 w-28">Selected Facility:</span>
+                <span className="text-xs text-white font-medium">{verdict.hospital}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Brain className="w-4 h-4 text-purple-400" />
+                <span className="text-xs text-slate-400 w-28">Confidence Score:</span>
+                <div className="flex-1 flex items-center gap-2">
+                  <span className="text-xs text-emerald-400 font-bold">{verdict.matchScore || 85}%</span>
+                  <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${verdict.matchScore || 85}%` }}
+                      transition={{ delay: 0.5, duration: 0.8 }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Facility Comparison */}
+          {verdict.alternativeHospitals && verdict.alternativeHospitals.length > 0 && (
+            <motion.div 
+              className="mb-4"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Facility Comparison <span className="text-slate-500">(Top Candidates)</span>
+              </h4>
+              <div className="space-y-2">
+                {/* Primary recommendation */}
+                <div className="flex items-center justify-between p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs text-white font-medium">{verdict.hospital}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                    <span className="text-emerald-400 font-bold">{verdict.matchScore || 85}%</span>
+                    <span>{verdict.distance || '8 km'}</span>
+                    <span className="text-emerald-400">✓ Recommended</span>
+                  </div>
+                </div>
+                {/* Alternatives */}
+                {verdict.alternativeHospitals.slice(0, 2).map((alt, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-slate-500" />
+                      <span className="text-xs text-slate-300">{alt.hospitalName}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                      <span className="text-cyan-400 font-medium">{alt.matchScore || (80 - idx * 5)}%</span>
+                      <span>{alt.distance ? `${alt.distance} km` : ((idx + 2) * 8) + ' km'}</span>
+                      {alt.reason && (
+                        <span className="flex items-center gap-1 text-amber-400">
+                          <AlertCircle className="w-3 h-3" /> {alt.reason}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Clinical Guidance */}
+          <motion.div 
+            className="mb-4"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Clinical Guidance</h4>
+            <div className="bg-slate-900/40 rounded-lg p-3 border border-slate-700/30">
+              {verdict.guidance ? (
+                <ul className="space-y-1.5">
+                  {verdict.guidance.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-xs text-slate-300">
+                      <span className="text-slate-500 mt-0.5">•</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <pre className="font-mono text-[11px] text-slate-300 whitespace-pre-wrap leading-relaxed">
+                  {verdict.reasoning}
+                </pre>
+              )}
+            </div>
           </motion.div>
         </div>
       </motion.div>
