@@ -14,6 +14,85 @@ const getGroqClient = () => {
   return groq;
 };
 
+// MegaLLM API fallback (OpenAI-compatible API)
+const callMegaLLM = async (messages, options = {}) => {
+  const apiKey = process.env.MEGALLM_API_KEY;
+  const apiUrl = process.env.MEGALLM_API_URL || 'https://api.aiguoguo199.com/v1';
+  
+  if (!apiKey) {
+    console.log('⚠️ MegaLLM API key not configured');
+    return null;
+  }
+  
+  console.log('🔄 Falling back to MegaLLM API...');
+  
+  try {
+    const response = await fetch(`${apiUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: options.model || 'gpt-4o-mini',
+        messages: messages,
+        temperature: options.temperature || 0.3,
+        max_tokens: options.max_tokens || 2000,
+        response_format: options.response_format
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('MegaLLM API error:', errorText);
+      return null;
+    }
+    
+    const data = await response.json();
+    console.log('✓ MegaLLM response received');
+    return data;
+  } catch (error) {
+    console.error('MegaLLM API call failed:', error.message);
+    return null;
+  }
+};
+
+// Wrapper function to call LLM with Groq primary and MegaLLM fallback
+const callLLMWithFallback = async (messages, options = {}) => {
+  const client = getGroqClient();
+  
+  // Try Groq first
+  if (client) {
+    try {
+      console.log('🚀 Calling Groq API...');
+      const completion = await client.chat.completions.create({
+        messages: messages,
+        model: options.model || MODEL,
+        temperature: options.temperature || 0.3,
+        max_tokens: options.max_tokens || 2000,
+        response_format: options.response_format
+      });
+      console.log('✓ Groq response received');
+      return completion;
+    } catch (groqError) {
+      console.error('⚠️ Groq API error:', groqError.message);
+      // Fall through to MegaLLM fallback
+    }
+  } else {
+    console.log('⚠️ Groq client not available');
+  }
+  
+  // Fallback to MegaLLM
+  const megaResponse = await callMegaLLM(messages, options);
+  if (megaResponse) {
+    return megaResponse;
+  }
+  
+  // Both failed
+  console.log('⚠️ Both Groq and MegaLLM failed, using mock mode');
+  return null;
+};
+
 const MODEL = 'llama-3.3-70b-versatile'; // Fast and capable model
 
 // Condition detection patterns
@@ -697,23 +776,24 @@ ${JSON.stringify(hospitalsSummary, null, 2)}
 
 Analyze the patient condition and match with the best available hospital. The patient has self-reported their severity as ${(patientData.reportedSeverity || 'moderate').toUpperCase()} - factor this into your assessment. Each hospital includes distance and ETA (estimated time of arrival) from the patient's location if available. For critical cases, strongly consider travel time - closer hospitals may be better even if slightly less specialized. Respond with JSON only, no markdown.`;
 
-    const client = getGroqClient();
-    if (!client) {
-      console.log('⚠️ Groq client not available, using mock mode');
-      return generateMockResponse(patientData, hospitals);
-    }
-
-    console.log('🚀 Calling Groq API...');
-    const completion = await client.chat.completions.create({
-      messages: [
+    // Use LLM with fallback (Groq primary, MegaLLM secondary)
+    const completion = await callLLMWithFallback(
+      [
         { role: 'system', content: HOSPITAL_REFERRAL_PROMPT },
         { role: 'user', content: userPrompt }
       ],
-      model: MODEL,
-      temperature: 0.3,
-      max_tokens: 2000,
-      response_format: { type: 'json_object' }
-    });
+      {
+        model: MODEL,
+        temperature: 0.3,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' }
+      }
+    );
+
+    if (!completion) {
+      console.log('⚠️ All LLM APIs failed, using mock mode');
+      return generateMockResponse(patientData, hospitals);
+    }
 
     const responseText = completion.choices[0]?.message?.content;
     
@@ -765,19 +845,9 @@ Analyze the patient condition and match with the best available hospital. The pa
 };
 
 export const analyzePatient = async (patientData) => {
-  if (!process.env.GROQ_API_KEY) {
-    return {
-      severity: 'moderate',
-      recommendation: 'Seek medical evaluation',
-      reasoning: 'Mock analysis - configure GROQ_API_KEY for AI analysis',
-      estimatedWaitTime: 30,
-      alertFlags: []
-    };
-  }
-
   try {
-    const completion = await groq.chat.completions.create({
-      messages: [
+    const completion = await callLLMWithFallback(
+      [
         {
           role: 'system',
           content: `You are NERVE, an AI medical triage assistant. Analyze patient data and return JSON only:
@@ -796,11 +866,23 @@ Complaint: ${patientData.chiefComplaint}
 Vitals: HR ${patientData.vitals?.heartRate}, SpO2 ${patientData.vitals?.oxygenSaturation}%, BP ${patientData.vitals?.bloodPressure?.systolic}/${patientData.vitals?.bloodPressure?.diastolic}`
         }
       ],
-      model: MODEL,
-      temperature: 0.3,
-      max_tokens: 500,
-      response_format: { type: 'json_object' }
-    });
+      {
+        model: MODEL,
+        temperature: 0.3,
+        max_tokens: 500,
+        response_format: { type: 'json_object' }
+      }
+    );
+
+    if (!completion) {
+      return {
+        severity: 'moderate',
+        recommendation: 'Seek medical evaluation',
+        reasoning: 'AI analysis unavailable - using fallback',
+        estimatedWaitTime: 30,
+        alertFlags: []
+      };
+    }
 
     const text = completion.choices[0]?.message?.content;
     if (text) {
@@ -820,17 +902,9 @@ Vitals: HR ${patientData.vitals?.heartRate}, SpO2 ${patientData.vitals?.oxygenSa
 };
 
 export const analyzeTelemetry = async (telemetryData) => {
-  if (!process.env.GROQ_API_KEY) {
-    return {
-      status: 'stable',
-      alerts: [],
-      summary: 'Mock telemetry analysis'
-    };
-  }
-
   try {
-    const completion = await groq.chat.completions.create({
-      messages: [
+    const completion = await callLLMWithFallback(
+      [
         {
           role: 'system',
           content: `Analyze patient telemetry and return JSON only: { "status": "stable"|"warning"|"critical", "alerts": [], "summary": "" }`
@@ -840,11 +914,17 @@ export const analyzeTelemetry = async (telemetryData) => {
           content: JSON.stringify(telemetryData)
         }
       ],
-      model: MODEL,
-      temperature: 0.2,
-      max_tokens: 300,
-      response_format: { type: 'json_object' }
-    });
+      {
+        model: MODEL,
+        temperature: 0.2,
+        max_tokens: 300,
+        response_format: { type: 'json_object' }
+      }
+    );
+
+    if (!completion) {
+      return { status: 'stable', alerts: [], summary: 'AI analysis unavailable' };
+    }
 
     const text = completion.choices[0]?.message?.content;
     if (text) {
