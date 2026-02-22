@@ -1,4 +1,5 @@
 import Hospital from '../models/Hospital.js';
+import { calculateDistancesToHospitals } from '../services/tomtomService.js';
 
 // @desc    Create new hospital
 // @route   POST /api/hospitals
@@ -264,6 +265,80 @@ export const updateMyHospital = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to update hospital',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get hospitals with real-time distances from user location
+// @route   GET /api/hospitals/nearby
+export const getNearbyHospitals = async (req, res) => {
+  try {
+    const { lat, lng } = req.query;
+    
+    if (!lat || !lng) {
+      return res.status(400).json({
+        success: false,
+        message: 'Latitude and longitude are required'
+      });
+    }
+
+    const userLocation = {
+      latitude: parseFloat(lat),
+      longitude: parseFloat(lng)
+    };
+
+    // Fetch all active hospitals (isActive defaults to true, so also include docs without the field)
+    const hospitals = await Hospital.find({ isActive: { $ne: false } });
+    
+    if (hospitals.length === 0) {
+      return res.json({
+        success: true,
+        count: 0,
+        data: []
+      });
+    }
+
+    // Calculate distances using TomTom API
+    const hospitalsWithDistances = await calculateDistancesToHospitals(userLocation, hospitals);
+    
+    // Format response
+    const formattedHospitals = hospitalsWithDistances.map(h => ({
+      id: h._id?.toString() || h.id,
+      name: h.name,
+      city: h.address?.city || '',
+      state: h.address?.state || '',
+      type: h.type,
+      distance: h.routeInfo?.distance ? `${h.routeInfo.distance} km` : 'N/A',
+      distanceKm: h.routeInfo?.distance || null,
+      eta: h.routeInfo?.durationWithTraffic || h.routeInfo?.emergencyDuration || h.routeInfo?.duration || null,
+      etaFormatted: h.routeInfo ? `${Math.round(h.routeInfo.durationWithTraffic || h.routeInfo.emergencyDuration || h.routeInfo.duration)} min` : 'N/A',
+      trafficDelay: h.routeInfo?.trafficDelay || 0,
+      icuBeds: h.facilities?.icuBeds || 0,
+      generalBeds: h.facilities?.generalBeds || 0,
+      departments: h.specializations || [],
+      status: !h.currentStatus?.isAcceptingPatients ? 'full' 
+            : h.facilities?.icuBeds === 0 ? 'limited' 
+            : 'available',
+      waitTime: h.currentStatus?.waitTime ? `${h.currentStatus.waitTime} min` : 'N/A',
+      emergencyAvailable: h.currentStatus?.emergencyAvailable || false,
+      occupancyRate: h.currentStatus?.occupancyRate || 0,
+      rating: h.rating || 4.0,
+      specializations: h.specializations || [],
+      coordinates: h.address?.coordinates || null
+    }));
+
+    res.json({
+      success: true,
+      count: formattedHospitals.length,
+      userLocation,
+      data: formattedHospitals
+    });
+  } catch (error) {
+    console.error('getNearbyHospitals error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch nearby hospitals',
       error: error.message
     });
   }

@@ -50,7 +50,7 @@ const hospitalSchema = new mongoose.Schema({
       'pediatrics', 'gynecology', 'urology', 'nephrology',
       'pulmonology', 'gastroenterology', 'dermatology',
       'psychiatry', 'ophthalmology', 'ent', 'general-surgery',
-      'plastic-surgery', 'trauma', 'emergency-medicine'
+      'plastic-surgery', 'trauma', 'emergency-medicine', 'general-medicine', 'transplant'
     ]
   }],
 

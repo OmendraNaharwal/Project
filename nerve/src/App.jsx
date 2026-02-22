@@ -25,10 +25,10 @@ function ProtectedRoute({ children }) {
 }
 
 function MainApp() {
+  const { location } = useAuth();
   const [verdict, setVerdict] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
-  const [patientLocation, setPatientLocation] = useState(null);
 
   const handlePatientSubmit = async (patientData) => {
     setIsProcessing(true);
@@ -36,8 +36,8 @@ function MainApp() {
     setError(null);
     
     try {
-      // Call backend API for AI-powered referral (include location if available)
-      const aiVerdict = await processReferral(patientData, patientLocation);
+      // Call backend API for AI-powered referral (include location from auth context)
+      const aiVerdict = await processReferral(patientData, location);
       setVerdict(aiVerdict);
     } catch (err) {
       console.error('Referral processing error:', err);
@@ -49,7 +49,7 @@ function MainApp() {
 
   return (
     <div className="min-h-screen flex flex-col text-slate-100 app-shell">
-      <Header onLocationChange={setPatientLocation} />
+      <Header />
 
       <main className="flex-1 px-4 py-4 lg:px-8 lg:py-6">
         <div className="h-full grid grid-cols-12 gap-4 lg:gap-6">
@@ -74,7 +74,13 @@ function MainApp() {
 
           <div className="col-span-12 lg:col-span-3">
             <div className="h-full min-h-[520px] lg:min-h-0">
-              <LiveTelemetry />
+              <LiveTelemetry 
+                location={location} 
+                recommendedHospitals={verdict ? [
+                  verdict.recommendedHospital,
+                  ...(verdict.alternativeHospitals?.slice(0, 2) || [])
+                ].filter(Boolean) : null}
+              />
             </div>
           </div>
         </div>

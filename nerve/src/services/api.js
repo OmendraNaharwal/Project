@@ -56,6 +56,24 @@ export const getHospitals = async () => {
   return result.data;
 };
 
+// Get nearby hospitals with TomTom-calculated distances
+export const getNearbyHospitals = async (location) => {
+  if (!location?.latitude || !location?.longitude) {
+    throw new Error('Location coordinates required');
+  }
+  
+  const response = await fetch(
+    `${API_BASE_URL}/hospitals/nearby?lat=${location.latitude}&lng=${location.longitude}`
+  );
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch nearby hospitals');
+  }
+
+  const result = await response.json();
+  return result.data;
+};
+
 // Health check
 export const healthCheck = async () => {
   const response = await fetch(`${API_BASE_URL}/health`);

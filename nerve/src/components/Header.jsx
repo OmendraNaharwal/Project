@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, UserCircle2, Settings, MapPin, Loader2 } from 'lucide-react';
+import { Activity, Settings, MapPin, Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
-const Header = ({ onLocationChange }) => {
+const Header = () => {
   const [time, setTime] = useState(new Date());
-  const [location, setLocation] = useState(null);
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [locationError, setLocationError] = useState(null);
+  const { location, locationLoading, locationError, fetchLocation } = useAuth();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -14,65 +13,6 @@ const Header = ({ onLocationChange }) => {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
-
-  const fetchLocation = () => {
-    setLocationLoading(true);
-    setLocationError(null);
-
-    if (!navigator.geolocation) {
-      setLocationError('Geolocation not supported');
-      setLocationLoading(false);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        
-        try {
-          // Reverse geocoding to get address
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-          );
-          const data = await response.json();
-          
-          const locationData = {
-            lat: latitude.toFixed(4),
-            lng: longitude.toFixed(4),
-            latitude: latitude,
-            longitude: longitude,
-            city: data.address?.city || data.address?.town || data.address?.village || data.address?.county || 'Unknown',
-            state: data.address?.state || ''
-          };
-          
-          setLocation(locationData);
-          // Notify parent component about location change
-          if (onLocationChange) {
-            onLocationChange(locationData);
-          }
-        } catch (err) {
-          const locationData = {
-            lat: latitude.toFixed(4),
-            lng: longitude.toFixed(4),
-            latitude: latitude,
-            longitude: longitude,
-            city: 'Location found',
-            state: ''
-          };
-          setLocation(locationData);
-          if (onLocationChange) {
-            onLocationChange(locationData);
-          }
-        }
-        setLocationLoading(false);
-      },
-      (err) => {
-        setLocationError('Access denied');
-        setLocationLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
 
   const formatTime = (date) => {
     return date.toLocaleTimeString('en-US', {
@@ -170,7 +110,6 @@ const Header = ({ onLocationChange }) => {
           </div>
 
           <div className="flex items-center gap-2 text-slate-400">
-            <UserCircle2 className="w-6 h-6" />
             <Link
               to="/hospitals"
               className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"

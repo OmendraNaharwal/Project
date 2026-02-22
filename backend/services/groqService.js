@@ -1,5 +1,5 @@
 import Groq from 'groq-sdk';
-import { getEmergencyDistanceScore } from './hereService.js';
+import { getEmergencyDistanceScore } from './tomtomService.js';
 
 // Lazy initialization - will be set when first API call is made
 let groq = null;
@@ -170,23 +170,29 @@ const generateMockResponse = (patientData, hospitals, historicalCases = []) => {
   
   const requiredSpecs = detectedCondition.specializations;
   const primarySpec = requiredSpecs[0]; // Most important specialization
+  const requiredFacilities = detectedCondition.facilities || [];
 
-  // Score hospitals based on condition match
+  // Score hospitals based on condition match using FULL HOSPITAL SCHEMA
   const scoredHospitals = hospitals.map(h => {
     let score = 30;
+    let decisionFactors = []; // Track why this hospital was scored
     
-    // Check specialization match
+    // ============================================
+    // 1. SPECIALIZATION MATCHING (Primary Factor)
+    // ============================================
     const specMatches = requiredSpecs.filter(spec => 
       h.specializations?.includes(spec)
     ).length;
     score += specMatches * 12;
+    if (specMatches > 0) {
+      decisionFactors.push(`${specMatches} specialization match(es)`);
+    }
     
     // SPECIALIZATION FOCUS BONUS: Prefer specialized hospitals over general ones
-    // Hospitals with fewer specializations that match are MORE specialized
     const totalSpecs = h.specializations?.length || 1;
     if (specMatches > 0 && totalSpecs <= 3) {
-      // Highly specialized hospital matching our need - big bonus
       score += 25;
+      decisionFactors.push('Highly specialized facility');
     } else if (specMatches > 0 && totalSpecs <= 5) {
       score += 10;
     }
@@ -194,81 +200,272 @@ const generateMockResponse = (patientData, hospitals, historicalCases = []) => {
     // PRIMARY SPECIALIZATION BONUS: If hospital's first/main spec matches our primary need
     if (h.specializations?.[0] === primarySpec) {
       score += 15;
+      decisionFactors.push('Primary specialization match');
     }
     
-    // NAME-BASED MATCHING: Check if hospital name suggests specialization
+    // ============================================
+    // 2. SPECIALIST AVAILABILITY (Critical Factor)
+    // ============================================
+    const availableSpecialists = h.staff?.specialists?.filter(s => 
+      s.available && requiredSpecs.includes(s.specialization)
+    ) || [];
+    if (availableSpecialists.length > 0) {
+      score += availableSpecialists.length * 10;
+      decisionFactors.push(`${availableSpecialists.length} specialist(s) on duty`);
+    }
+    
+    // ============================================
+    // 3. HOSPITAL TYPE CONSIDERATION
+    // ============================================
+    const hospitalType = h.type?.toLowerCase() || 'private';
+    if (severity === 'critical' || severity === 'urgent') {
+      // For critical/urgent cases, government hospitals often have robust trauma/emergency
+      if (hospitalType === 'government' && (detectedCondition.name === 'trauma' || detectedCondition.name === 'general')) {
+        score += 8;
+        decisionFactors.push('Government trauma facility');
+      }
+      // Trust hospitals often have good emergency services
+      if (hospitalType === 'trust') {
+        score += 5;
+      }
+    }
+    // Private hospitals may have better elective/specialized care
+    if (severity === 'moderate' || severity === 'minor') {
+      if (hospitalType === 'private' && h.rating >= 4.0) {
+        score += 5;
+      }
+    }
+    
+    // ============================================
+    // 4. NAME-BASED MATCHING (Hospital Identity)
+    // ============================================
     const hospitalNameLower = h.name?.toLowerCase() || '';
     if (detectedCondition.name === 'cardiac' && 
         (hospitalNameLower.includes('heart') || hospitalNameLower.includes('cardiac'))) {
       score += 20;
+      decisionFactors.push('Cardiac-focused facility');
     }
     if (detectedCondition.name === 'pediatric' && 
         (hospitalNameLower.includes('child') || hospitalNameLower.includes('pediatric'))) {
       score += 20;
+      decisionFactors.push('Pediatric-focused facility');
     }
     if (detectedCondition.name === 'trauma' && hospitalNameLower.includes('trauma')) {
       score += 20;
+      decisionFactors.push('Trauma center');
     }
     if (detectedCondition.name === 'neurological' && hospitalNameLower.includes('neuro')) {
       score += 20;
+      decisionFactors.push('Neurology center');
     }
     
-    // Check facility match
-    const facilityMatches = detectedCondition.facilities?.filter(fac => 
+    // ============================================
+    // 5. FACILITY MATCHING (Equipment/Resources)
+    // ============================================
+    const facilityMatches = requiredFacilities.filter(fac => 
       h.facilities?.[fac] === true || h.facilities?.[fac] > 0
-    ).length || 0;
+    ).length;
     score += facilityMatches * 8;
-    
-    // Emergency availability bonus for critical cases
-    if (h.currentStatus?.emergencyAvailable && severity === 'critical') {
-      score += 10;
+    if (facilityMatches > 0) {
+      decisionFactors.push(`${facilityMatches}/${requiredFacilities.length} required facilities`);
     }
     
-    // Wait time scoring
-    const waitTime = h.currentStatus?.waitTime || 30;
-    if (waitTime <= 10) {
-      score += 10;
-    } else if (waitTime <= 20) {
-      score += 5;
-    } else if (waitTime > 40) {
-      score -= 10;
+    // Specific facility bonuses based on severity
+    if (severity === 'critical') {
+      // ICU beds are crucial
+      const icuBeds = h.facilities?.icuBeds || 0;
+      if (icuBeds >= 20) {
+        score += 15;
+        decisionFactors.push(`${icuBeds} ICU beds available`);
+      } else if (icuBeds >= 10) {
+        score += 10;
+      } else if (icuBeds > 0) {
+        score += 5;
+      }
+      
+      // Ventilators for respiratory/critical
+      const ventilators = h.facilities?.ventilators || 0;
+      if (detectedCondition.name === 'respiratory' && ventilators > 5) {
+        score += 12;
+        decisionFactors.push(`${ventilators} ventilators`);
+      }
+      
+      // Operation theaters for trauma/surgery
+      const ots = h.facilities?.operationTheaters || 0;
+      if (detectedCondition.name === 'trauma' && ots >= 3) {
+        score += 10;
+        decisionFactors.push(`${ots} operation theaters`);
+      }
     }
     
-    // Staff availability bonus
+    // CT/MRI scanners for neurological
+    if (detectedCondition.name === 'neurological') {
+      if (h.facilities?.ctScanner) {
+        score += 8;
+        decisionFactors.push('CT Scanner available');
+      }
+      if (h.facilities?.mriScanner) {
+        score += 10;
+        decisionFactors.push('MRI Scanner available');
+      }
+    }
+    
+    // ============================================
+    // 6. EMERGENCY SERVICES & AMBULANCE
+    // ============================================
+    if (h.currentStatus?.emergencyAvailable) {
+      if (severity === 'critical') {
+        score += 15;
+        decisionFactors.push('Emergency services active');
+      } else if (severity === 'urgent') {
+        score += 8;
+      }
+    } else if (severity === 'critical') {
+      score -= 20; // Major penalty for critical case without emergency
+    }
+    
+    // Ambulance availability for critical transfers
+    const ambulances = h.facilities?.ambulanceCount || 0;
+    if (severity === 'critical' && ambulances > 0) {
+      score += Math.min(ambulances * 2, 10);
+      if (ambulances >= 3) {
+        decisionFactors.push(`${ambulances} ambulances available`);
+      }
+    }
+    
+    // ============================================
+    // 7. STAFF AVAILABILITY
+    // ============================================
     const availableDoctors = h.staff?.doctors?.available || 0;
-    if (availableDoctors > 30) {
+    const availableNurses = h.staff?.nurses?.available || 0;
+    const staffRatio = availableDoctors + (availableNurses * 0.3);
+    
+    if (staffRatio > 40) {
+      score += 10;
+      decisionFactors.push('Excellent staff availability');
+    } else if (staffRatio > 25) {
+      score += 6;
+    } else if (staffRatio > 15) {
+      score += 3;
+    } else if (staffRatio < 5) {
+      score -= 10;
+      decisionFactors.push('Limited staff');
+    }
+    
+    // ============================================
+    // 8. WAIT TIME & OCCUPANCY
+    // ============================================
+    const waitTime = h.currentStatus?.waitTime || 30;
+    if (severity === 'critical' || severity === 'urgent') {
+      // Critical cases need immediate attention
+      if (waitTime <= 5) {
+        score += 15;
+        decisionFactors.push('Minimal wait time');
+      } else if (waitTime <= 10) {
+        score += 10;
+      } else if (waitTime <= 20) {
+        score += 5;
+      } else if (waitTime > 45) {
+        score -= 15;
+        decisionFactors.push('Long wait time');
+      }
+    } else {
+      // Moderate/minor cases
+      if (waitTime <= 15) {
+        score += 8;
+      } else if (waitTime > 40) {
+        score -= 8;
+      }
+    }
+    
+    // Occupancy rate impacts care quality
+    const occupancy = h.currentStatus?.occupancyRate || 50;
+    if (occupancy > 90) {
+      score -= 20;
+      decisionFactors.push('Near full capacity');
+    } else if (occupancy > 80) {
+      score -= 10;
+    } else if (occupancy > 70) {
+      score -= 5;
+    } else if (occupancy < 40) {
       score += 8;
-    } else if (availableDoctors > 15) {
+      decisionFactors.push('Low occupancy');
+    } else if (occupancy < 55) {
       score += 4;
     }
     
-    // ICU availability for critical cases
-    if (severity === 'critical' && h.facilities?.icuBeds > 10) {
-      score += 10;
+    // ============================================
+    // 9. ACCEPTING PATIENTS CHECK
+    // ============================================
+    if (h.currentStatus?.isAcceptingPatients === false) {
+      score -= 50; // Major penalty - not accepting
+      decisionFactors.push('NOT ACCEPTING PATIENTS');
     }
     
-    // Occupancy penalty
-    const occupancy = h.currentStatus?.occupancyRate || 50;
-    if (occupancy > 85) {
-      score -= 15;
-    } else if (occupancy > 70) {
+    // ============================================
+    // 10. HOSPITAL RATING
+    // ============================================
+    const rating = h.rating || 3.5;
+    if (rating >= 4.5) {
+      score += 8;
+      decisionFactors.push(`${rating}★ rating`);
+    } else if (rating >= 4.0) {
+      score += 5;
+    } else if (rating < 3.0) {
       score -= 5;
-    } else if (occupancy < 50) {
-      score += 5;
     }
     
-    // Rating bonus
-    if (h.rating >= 4.5) {
-      score += 5;
-    }
-    
-    // Distance scoring - factor in route info if available
+    // ============================================
+    // 11. DISTANCE & ETA (TomTom Integration)
+    // ============================================
     const distanceScore = getEmergencyDistanceScore(h.routeInfo, severity);
     score += distanceScore;
     
-    // Store raw score (uncapped) for proper sorting, then cap for display
+    if (h.routeInfo) {
+      const eta = h.routeInfo.durationWithTraffic || h.routeInfo.emergencyDuration || h.routeInfo.duration;
+      const distance = h.routeInfo.distance;
+      const trafficDelay = h.routeInfo.trafficDelay || 0;
+      
+      if (severity === 'critical') {
+        // For critical: every minute counts
+        if (eta <= 8) {
+          decisionFactors.push(`${eta} min ETA (critical proximity)`);
+        } else if (eta > 20) {
+          decisionFactors.push(`${eta} min ETA (consider closer alternatives)`);
+        }
+        if (trafficDelay > 5) {
+          decisionFactors.push(`${trafficDelay} min traffic delay`);
+        }
+      } else {
+        if (distance) {
+          decisionFactors.push(`${distance} km, ${eta} min`);
+        }
+      }
+    }
+    
+    // ============================================
+    // 12. GENERAL BED AVAILABILITY
+    // ============================================
+    const generalBeds = h.facilities?.generalBeds || 0;
+    if (generalBeds > 100) {
+      score += 5;
+    } else if (generalBeds < 20 && severity !== 'minor') {
+      score -= 5;
+    }
+    
+    // Store raw score (uncapped) for proper sorting
+    // Normalize score to 0-100 range (base was 50, so 50 = 50%, 100+ raw = 95% max)
     const rawScore = score;
-    return { hospital: h, score: Math.min(Math.max(rawScore, 15), 100), rawScore, specMatches, totalSpecs, routeInfo: h.routeInfo };
+    const normalizedScore = Math.min(Math.max(Math.round((rawScore / 120) * 100), 15), 95); // Cap at 95% to avoid 100% confidence
+    return { 
+      hospital: h, 
+      score: normalizedScore, 
+      rawScore, 
+      specMatches, 
+      totalSpecs, 
+      routeInfo: h.routeInfo,
+      decisionFactors: decisionFactors.slice(0, 5) // Top 5 factors
+    };
   }).sort((a, b) => {
     // Primary sort: by raw score (higher is better)
     if (b.rawScore !== a.rawScore) return b.rawScore - a.rawScore;
@@ -301,7 +498,7 @@ const generateMockResponse = (patientData, hospitals, historicalCases = []) => {
 
   // Build distance reason if available
   const distanceReason = best.routeInfo 
-    ? `Distance: ${best.routeInfo.distance} km, ETA: ${best.routeInfo.emergencyDuration || best.routeInfo.duration} min`
+    ? `Distance: ${best.routeInfo.distance} km, ETA: ${best.routeInfo.durationWithTraffic || best.routeInfo.emergencyDuration || best.routeInfo.duration} min${best.routeInfo.trafficDelay > 0 ? ` (${best.routeInfo.trafficDelay} min traffic delay)` : ''}`
     : null;
 
   return {
@@ -316,10 +513,15 @@ const generateMockResponse = (patientData, hospitals, historicalCases = []) => {
     recommendedHospital: {
       hospitalId: best.hospital._id.toString(),
       hospitalName: best.hospital.name,
+      hospitalType: best.hospital.type || 'private',
+      city: best.hospital.address?.city || '',
+      state: best.hospital.address?.state || '',
       matchScore: best.score,
       distance: best.routeInfo?.distance || null,
-      eta: best.routeInfo?.emergencyDuration || best.routeInfo?.duration || null,
+      eta: best.routeInfo?.durationWithTraffic || best.routeInfo?.emergencyDuration || best.routeInfo?.duration || null,
+      trafficDelay: best.routeInfo?.trafficDelay || 0,
       routeInfo: best.routeInfo || null,
+      decisionFactors: best.decisionFactors || [],
       reasons: [
         `Has ${requiredSpecs.filter(s => best.hospital.specializations?.includes(s)).join(', ') || 'general'} specialists`,
         `Wait time: ${best.hospital.currentStatus?.waitTime || 15} minutes`,
@@ -327,15 +529,37 @@ const generateMockResponse = (patientData, hospitals, historicalCases = []) => {
         `${best.hospital.facilities?.icuBeds || 0} ICU beds available`,
         ...(distanceReason ? [distanceReason] : [])
       ],
-      estimatedWaitTime: best.hospital.currentStatus?.waitTime || 15
+      estimatedWaitTime: best.hospital.currentStatus?.waitTime || 15,
+      occupancyRate: best.hospital.currentStatus?.occupancyRate || 50,
+      rating: best.hospital.rating || 4.0,
+      specializations: best.hospital.specializations || [],
+      icuBeds: best.hospital.facilities?.icuBeds || 0,
+      facilities: {
+        icuBeds: best.hospital.facilities?.icuBeds || 0,
+        ventilators: best.hospital.facilities?.ventilators || 0,
+        operationTheaters: best.hospital.facilities?.operationTheaters || 0,
+        ambulanceCount: best.hospital.facilities?.ambulanceCount || 0
+      }
     },
     alternativeHospitals: alternatives.map(alt => ({
       hospitalId: alt.hospital._id.toString(),
       hospitalName: alt.hospital.name,
+      hospitalType: alt.hospital.type || 'private',
+      city: alt.hospital.address?.city || '',
+      state: alt.hospital.address?.state || '',
       matchScore: alt.score,
       distance: alt.routeInfo?.distance || null,
-      eta: alt.routeInfo?.emergencyDuration || alt.routeInfo?.duration || null,
-      reason: `${alt.hospital.specializations?.filter(s => requiredSpecs.includes(s)).length || 0} matching specializations, ${alt.hospital.facilities?.icuBeds || 0} ICU beds${alt.routeInfo ? `, ${alt.routeInfo.distance} km away` : ''}`
+      eta: alt.routeInfo?.durationWithTraffic || alt.routeInfo?.emergencyDuration || alt.routeInfo?.duration || null,
+      trafficDelay: alt.routeInfo?.trafficDelay || 0,
+      decisionFactors: alt.decisionFactors || [],
+      reason: `${alt.hospital.specializations?.filter(s => requiredSpecs.includes(s)).length || 0} matching specializations, ${alt.hospital.facilities?.icuBeds || 0} ICU beds${alt.routeInfo ? `, ${alt.routeInfo.distance} km away` : ''}`,
+      rating: alt.hospital.rating || 4.0,
+      specializations: alt.hospital.specializations || [],
+      icuBeds: alt.hospital.facilities?.icuBeds || 0,
+      facilities: {
+        icuBeds: alt.hospital.facilities?.icuBeds || 0,
+        ventilators: alt.hospital.facilities?.ventilators || 0
+      }
     })),
     urgentTransfer: severity === 'critical',
     additionalNotes: severity === 'critical' 

@@ -71,7 +71,7 @@ const LoginPage = () => {
         if (!formData.hospitalId) {
           throw new Error('Please select your hospital');
         }
-        const result = await register(formData.email, formData.password, formData.hospitalId);
+        const result = await register(formData.email, formData.password, formData.hospitalId, formData.customHospitalCode);
         // Show success with hospital code
         setRegistrationSuccess({
           hospitalCode: result.hospitalCode,
@@ -190,14 +190,14 @@ const LoginPage = () => {
                   <input
                     type="text"
                     value={formData.hospitalCode}
-                    onChange={(e) => setFormData({ ...formData, hospitalCode: e.target.value })}
-                    className="w-full pl-10 pr-4 py-2.5 bg-black/30 border border-white/10 rounded-lg text-white text-sm focus:border-emerald-500/50 focus:outline-none"
-                    placeholder="NERVE-XXXXXX"
+                    onChange={(e) => setFormData({ ...formData, hospitalCode: e.target.value.toUpperCase() })}
+                    className="w-full pl-10 pr-4 py-2.5 bg-black/30 border border-white/10 rounded-lg text-white text-sm focus:border-emerald-500/50 focus:outline-none uppercase"
+                    placeholder="Enter your Hospital ID"
                     required
                     autoComplete="off"
                   />
                 </div>
-                <p className="text-xs text-slate-500 mt-1">Enter the Hospital ID provided during registration</p>
+                <p className="text-xs text-slate-500 mt-1">Enter the Hospital ID you created during registration</p>
               </div>
             ) : (
               // REGISTRATION VIEW - Hospital dropdown + other fields
@@ -220,6 +220,25 @@ const LoginPage = () => {
                       ))}
                     </select>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1.5">Create Hospital ID</label>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                      type="text"
+                      value={formData.customHospitalCode || ''}
+                      onChange={(e) => setFormData({ ...formData, customHospitalCode: e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '') })}
+                      className="w-full pl-10 pr-4 py-2.5 bg-black/30 border border-white/10 rounded-lg text-white text-sm focus:border-emerald-500/50 focus:outline-none uppercase"
+                      placeholder="e.g., APOLLO-001"
+                      required
+                      autoComplete="off"
+                      minLength={4}
+                      maxLength={20}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">Create a unique ID for signing in (4-20 characters, letters, numbers, dashes)</p>
                 </div>
 
                 <div>

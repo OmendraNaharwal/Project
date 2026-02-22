@@ -8,11 +8,15 @@ import {
   getAvailableHospitals,
   deleteHospital,
   getMyHospital,
-  updateMyHospital
+  updateMyHospital,
+  getNearbyHospitals
 } from '../controllers/hospitalController.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// GET /api/hospitals/nearby - Get hospitals with TomTom distances
+router.get('/nearby', getNearbyHospitals);
 
 // GET /api/hospitals/available - Get available hospitals for referral
 router.get('/available', getAvailableHospitals);

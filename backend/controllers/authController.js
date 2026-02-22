@@ -14,7 +14,27 @@ const generateToken = (userId) => {
 // @route   POST /api/auth/register
 export const register = async (req, res) => {
   try {
-    const { email, password, name, hospitalId } = req.body;
+    const { email, password, name, hospitalId, hospitalCode } = req.body;
+
+    // Validate hospital code format if provided
+    if (hospitalCode) {
+      const codeRegex = /^[A-Z0-9-]{4,20}$/;
+      if (!codeRegex.test(hospitalCode.toUpperCase())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Hospital ID must be 4-20 characters, containing only letters, numbers, and dashes'
+        });
+      }
+      
+      // Check if hospital code already exists
+      const existingCode = await User.findOne({ hospitalCode: hospitalCode.toUpperCase() });
+      if (existingCode) {
+        return res.status(400).json({
+          success: false,
+          message: 'This Hospital ID is already taken. Please choose a different one.'
+        });
+      }
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -43,12 +63,13 @@ export const register = async (req, res) => {
       });
     }
 
-    // Create user (use email username as name if not provided)
+    // Create user with custom or auto-generated hospital code
     const user = await User.create({
       email,
       password,
       name: name || email.split('@')[0],
       hospital: hospitalId,
+      hospitalCode: hospitalCode ? hospitalCode.toUpperCase() : undefined, // Will auto-generate if undefined
       role: 'hospital_admin'
     });
 

@@ -47,19 +47,27 @@ const generateMockResponse = (patientData, hospitals) => {
     recommendedHospital: {
       hospitalId: best.hospital._id.toString(),
       hospitalName: best.hospital.name,
+      city: best.hospital.address?.city || '',
+      state: best.hospital.address?.state || '',
       matchScore: best.score,
       reasons: [
         `${best.hospital.specializations?.length || 0} relevant specializations available`,
         `Wait time: ${best.hospital.currentStatus?.waitTime || 'N/A'} minutes`,
         `${best.hospital.staff?.doctors?.available || 0} doctors available`
       ],
-      estimatedWaitTime: best.hospital.currentStatus?.waitTime || 15
+      estimatedWaitTime: best.hospital.currentStatus?.waitTime || 15,
+      specializations: best.hospital.specializations || [],
+      rating: best.hospital.rating || 4.0
     },
     alternativeHospitals: alternatives.map(alt => ({
       hospitalId: alt.hospital._id.toString(),
       hospitalName: alt.hospital.name,
+      city: alt.hospital.address?.city || '',
+      state: alt.hospital.address?.state || '',
       matchScore: alt.score,
-      reason: `Alternative facility with ${alt.hospital.facilities?.icuBeds || 0} ICU beds`
+      reason: `Alternative facility with ${alt.hospital.facilities?.icuBeds || 0} ICU beds`,
+      specializations: alt.hospital.specializations || [],
+      rating: alt.hospital.rating || 4.0
     })),
     urgentTransfer: severity === 'critical',
     additionalNotes: severity === 'critical' ? 'Immediate transfer recommended. Alert receiving facility.' : ''

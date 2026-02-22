@@ -2,7 +2,7 @@ import Patient from '../models/Patient.js';
 import Hospital from '../models/Hospital.js';
 import TriageHistory from '../models/TriageHistory.js';
 import { findBestHospital } from '../services/groqService.js';
-import { calculateDistancesToHospitals } from '../services/hereService.js';
+import { calculateDistancesToHospitals } from '../services/tomtomService.js';
 
 // @desc    Process patient and find best hospital referral
 // @route   POST /api/referral

@@ -56,7 +56,7 @@ const userSchema = new mongoose.Schema({
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  // Generate hospital code for new users
+  // Generate hospital code for new users only if not already set
   if (this.isNew && !this.hospitalCode) {
     let code;
     let isUnique = false;
@@ -66,6 +66,11 @@ userSchema.pre('save', async function(next) {
       if (!existing) isUnique = true;
     }
     this.hospitalCode = code;
+  }
+  
+  // Ensure hospitalCode is uppercase
+  if (this.hospitalCode) {
+    this.hospitalCode = this.hospitalCode.toUpperCase();
   }
   
   if (!this.isModified('password')) return next();
